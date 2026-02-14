@@ -1,0 +1,6 @@
+google-generativeai
+pandas
+openpyxl
+requests
+curl_cffi
+python-dotenv
