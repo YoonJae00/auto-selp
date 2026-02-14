@@ -2,3 +2,9 @@
 1. Creating Test User: test_1771062825@autoselp.com
 HTTP Request: POST https://zrablxndgurvgulmalsf.supabase.co/auth/v1/signup "HTTP/2 400 Bad Request"
    -> Auth Failed: Email address "test_1771062825@autoselp.com" is invalid
+=== Auto-Selp Backend Integration Test ===
+1. Authenticating User: admin@autoselp.com
+HTTP Request: POST https://zrablxndgurvgulmalsf.supabase.co/auth/v1/token?grant_type=password "HTTP/2 400 Bad Request"
+   -> Login failed, trying Sign Up...
+HTTP Request: POST https://zrablxndgurvgulmalsf.supabase.co/auth/v1/signup "HTTP/2 400 Bad Request"
+   -> Auth Failed: Email address "admin@autoselp.com" is invalid
