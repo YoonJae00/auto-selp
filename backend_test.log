@@ -1,0 +1,4 @@
+=== Auto-Selp Backend Integration Test ===
+1. Creating Test User: test_1771062825@autoselp.com
+HTTP Request: POST https://zrablxndgurvgulmalsf.supabase.co/auth/v1/signup "HTTP/2 400 Bad Request"
+   -> Auth Failed: Email address "test_1771062825@autoselp.com" is invalid

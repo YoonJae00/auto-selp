@@ -4,3 +4,8 @@ openpyxl
 requests
 curl_cffi
 python-dotenv
+fastapi
+uvicorn
+supabase
+python-multipart
+python-jose[cryptography]
