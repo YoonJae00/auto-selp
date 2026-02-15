@@ -58,7 +58,7 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
         excel_handler = ExcelHandler()
         pn_processor = ProductNameProcessor()
         kw_processor = KeywordProcessor()
-        cat_processor = CategoryProcessor()
+        cat_processor = CategoryProcessor(mapping_file_path="mapping.xlsx")
         
         # 5. Load Data with dynamic column mapping
         # We only need to READ from original_product_name column
@@ -155,8 +155,7 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
                 }).eq("id", job_id).execute()
                 last_step_update = 'category'
             
-            category_code = ""
-            # TODO: Implement category processing if category_col is provided
+            category_code = cat_processor.get_category_code(refined_name)
             
             # Store result
             results.append({
