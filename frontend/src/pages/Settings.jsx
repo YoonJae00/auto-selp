@@ -6,8 +6,9 @@ import { ExcelColumnMapping } from '../components/settings/ExcelColumnMapping';
 import { ApiKeyManagement } from '../components/settings/ApiKeyManagement';
 import { ThemeSettings } from '../components/settings/ThemeSettings';
 import { PromptManagement } from '../components/settings/PromptManagement';
+import { LLMProviderSettings } from '../components/settings/LLMProviderSettings';
 import { LoadingSkeleton } from '../components/ui/Loading';
-import { FileSpreadsheet, Key, Wand2, Palette } from 'lucide-react';
+import { FileSpreadsheet, Key, Wand2, Palette, Settings as SettingsIcon } from 'lucide-react';
 import api from '../lib/api';
 import { useSearchParams } from 'react-router-dom';
 
@@ -19,6 +20,7 @@ const fetchSettings = async () => {
 const TABS = [
     { key: 'excel', label: '엑셀 설정', icon: FileSpreadsheet, description: '엑셀 컬럼명 매핑 설정' },
     { key: 'api', label: 'API 키', icon: Key, description: 'API 키 관리 및 연결 테스트' },
+    { key: 'llm', label: 'AI 모델', icon: SettingsIcon, description: 'LLM 제공자 선택' },
     { key: 'prompts', label: '프롬프트', icon: Wand2, description: 'AI 프롬프트 관리' },
     { key: 'theme', label: '테마', icon: Palette, description: '화이트/다크 모드 설정' },
 ];
@@ -58,6 +60,12 @@ const Settings = () => {
     const handleSaveApiKeys = (apiKeys) => {
         updateSettingsMutation.mutate({
             api_keys: apiKeys
+        });
+    };
+
+    const handleSaveLLMPreferences = (preferences) => {
+        updateSettingsMutation.mutate({
+            preferences: preferences
         });
     };
 
@@ -131,6 +139,15 @@ const Settings = () => {
                                         apiKeys={settings?.api_keys}
                                         onChange={() => { }}
                                         onSave={handleSaveApiKeys}
+                                        isSaving={updateSettingsMutation.isPending}
+                                    />
+                                )}
+
+                                {activeTab === 'llm' && (
+                                    <LLMProviderSettings
+                                        preferences={settings?.preferences}
+                                        onChange={() => { }}
+                                        onSave={handleSaveLLMPreferences}
                                         isSaving={updateSettingsMutation.isPending}
                                     />
                                 )}

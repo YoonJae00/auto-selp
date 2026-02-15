@@ -10,3 +10,4 @@ supabase
 python-multipart
 python-jose[cryptography]
 cryptography
+openai
