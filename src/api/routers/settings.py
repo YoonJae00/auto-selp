@@ -31,6 +31,7 @@ class ExcelColumnMapping(BaseModel):
 
 class ApiKeys(BaseModel):
     gemini_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
     naver_api_key: Optional[str] = None
     naver_secret_key: Optional[str] = None
     naver_customer_id: Optional[str] = None
@@ -41,7 +42,7 @@ class ApiKeys(BaseModel):
 class UserSettingsUpdate(BaseModel):
     excel_column_mapping: Optional[ExcelColumnMapping] = None
     api_keys: Optional[ApiKeys] = None
-    preferences: Optional[Dict[str, Any]] = None
+    preferences: Optional[Dict[str, Any]] = None  # llm_provider 등 저장
 
 class UserSettingsResponse(BaseModel):
     id: str
@@ -56,9 +57,25 @@ class UserSettingsResponse(BaseModel):
 
 def encrypt_api_key(api_key: str) -> str:
     """API 키를 암호화합니다."""
-    if not api_key:
+    if not api_key or not api_key.strip():
         return ""
-    return cipher.encrypt(api_key.encode()).decode()
+    try:
+        # 공백 제거
+        clean_key = api_key.strip()
+        # ASCII 검증
+        try:
+            clean_key.encode('ascii')
+        except UnicodeEncodeError:
+            print(f"[WARNING] API 키에 비-ASCII 문자 포함, 제거합니다.")
+            clean_key = ''.join(char for char in clean_key if ord(char) < 128).strip()
+            if not clean_key:
+                print(f"[ERROR] API 키 정제 후 빈 문자열")
+                return ""
+        
+        return cipher.encrypt(clean_key.encode()).decode()
+    except Exception as e:
+        print(f"[ERROR] API 키 암호화 실패: {e}")
+        return ""
 
 def decrypt_api_key(encrypted_key: str) -> str:
     """암호화된 API 키를 복호화합니다."""
@@ -79,8 +96,13 @@ def encrypt_api_keys(api_keys: ApiKeys) -> Dict[str, str]:
     """모든 API 키를 암호화합니다."""
     encrypted = {}
     for key, value in api_keys.dict(exclude_none=True).items():
-        if value:
-            encrypted[key] = encrypt_api_key(value)
+        if value and value.strip():  # 빈 문자열 필터링
+            encrypted_value = encrypt_api_key(value)
+            if encrypted_value:  # 암호화 성공한 것만 추가
+                encrypted[key] = encrypted_value
+                print(f"[INFO] API 키 암호화 성공: {key}")
+            else:
+                print(f"[WARNING] API 키 암호화 실패: {key}")
     return encrypted
 
 def mask_api_keys(encrypted_keys: Dict[str, str]) -> Dict[str, str]:
@@ -178,6 +200,7 @@ async def test_api_connection(
     
     지원하는 api_type:
     - gemini: Gemini API
+    - openai: OpenAI API
     - naver_ad: Naver 광고 API
     - naver_search: Naver 쇼핑 검색 API
     """
@@ -194,6 +217,42 @@ async def test_api_connection(
             response = model.generate_content("Hello, test connection")
             
             return {"success": True, "message": "Gemini API 연결 성공"}
+        except Exception as e:
+            return {"success": False, "message": f"연결 실패: {str(e)}"}
+    
+    elif api_type == "openai":
+        try:
+            api_key = api_credentials.get("openai_api_key")
+            if not api_key:
+                raise HTTPException(status_code=400, detail="API 키가 필요합니다.")
+            
+            # API Key 정제 (비-ASCII 문자 제거)
+            api_key = api_key.strip()
+            try:
+                api_key.encode('ascii')
+            except UnicodeEncodeError:
+                print(f"[WARNING] 테스트용 API 키에 비-ASCII 문자 포함, 제거합니다.")
+                api_key = ''.join(char for char in api_key if ord(char) < 128).strip()
+                if not api_key:
+                    raise HTTPException(status_code=400, detail="유효한 API 키가 아닙니다.")
+            
+            # OpenAI API 테스트
+            from openai import OpenAI
+            import httpx
+            
+            http_client = httpx.Client(
+                headers={"Content-Type": "application/json; charset=utf-8"},
+                timeout=10.0
+            )
+            
+            client = OpenAI(api_key=api_key, http_client=http_client)
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": "Hello, test connection"}],
+                max_tokens=10
+            )
+            
+            return {"success": True, "message": "OpenAI API 연결 성공"}
         except Exception as e:
             return {"success": False, "message": f"연결 실패: {str(e)}"}
     
@@ -237,6 +296,7 @@ async def get_decrypted_api_key(
         # 환경변수 폴백
         env_key_map = {
             "gemini_api_key": "GEMINI_API_KEY",
+            "openai_api_key": "OPENAI_API_KEY",
             "naver_api_key": "NAVER_API_KEY",
             "naver_secret_key": "NAVER_SECRET_KEY",
             "naver_customer_id": "NAVER_CUSTOMER_ID",

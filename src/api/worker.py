@@ -3,13 +3,15 @@ from src.excel_handler import ExcelHandler
 from src.product_name_processor import ProductNameProcessor
 from src.keyword_processor import KeywordProcessor
 from src.category_processor import CategoryProcessor
+from src.llm_provider import get_llm_provider
+from src.user_settings_utils import get_user_api_key
 import os
 import time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, kw_prompt, cat_processor):
+def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, kw_prompt, cat_processor, llm_provider):
     """
     Process a single chunk of data and update progress in the database.
     
@@ -22,13 +24,14 @@ def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, k
         pn_prompt: Product name prompt
         kw_prompt: Keyword prompt
         cat_processor: Category processor instance
+        llm_provider: LLM provider instance
     
     Returns:
         List of processed results
     """
     db = get_db()
-    pn_processor = ProductNameProcessor()
-    kw_processor = KeywordProcessor()
+    pn_processor = ProductNameProcessor(llm_provider=llm_provider)
+    kw_processor = KeywordProcessor(llm_provider=llm_provider)
     
     results = []
     total_in_chunk = len(data_chunk)
@@ -165,7 +168,32 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
         kw_res = db.table("prompts").select("content").eq("user_id", user_id).eq("type", "keyword").eq("is_active", True).execute()
         kw_prompt = kw_res.data[0]['content'] if kw_res.data else None
 
-        # 5. Initialize Processors
+        # 5. Get user's LLM provider preference and API key
+        settings_res = db.table("user_settings").select("preferences, api_keys").eq("user_id", user_id).execute()
+        llm_provider_type = "gemini"  # default
+        llm_api_key = None
+        
+        if settings_res.data:
+            user_settings = settings_res.data[0]
+            preferences = user_settings.get("preferences", {})
+            api_keys = user_settings.get("api_keys", {})
+            
+            # Get LLM provider preference
+            llm_provider_type = preferences.get("llm_provider", "gemini")
+            
+            # Get API key based on provider type
+            if llm_provider_type == "openai":
+                llm_api_key = get_user_api_key(db, user_id, "openai_api_key")
+                print(f"[DEBUG] OpenAI API Key 획득: {llm_api_key[:10] if llm_api_key and len(llm_api_key) >= 10 else llm_api_key}... (길이: {len(llm_api_key) if llm_api_key else 0})")
+            elif llm_provider_type == "gemini":
+                llm_api_key = get_user_api_key(db, user_id, "gemini_api_key")
+                print(f"[DEBUG] Gemini API Key 획득: {llm_api_key[:10] if llm_api_key and len(llm_api_key) >= 10 else llm_api_key}... (길이: {len(llm_api_key) if llm_api_key else 0})")
+        
+        # Create LLM provider instance
+        llm_provider = get_llm_provider(provider_type=llm_provider_type, api_key=llm_api_key)
+        print(f"Using LLM provider: {llm_provider_type}")
+
+        # 6. Initialize Processors
         excel_handler = ExcelHandler()
         cat_processor = CategoryProcessor(mapping_file_path="naver_category_mapping.xls")
         
@@ -209,7 +237,8 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
                         meta_data,
                         pn_prompt,
                         kw_prompt,
-                        cat_processor
+                        cat_processor,
+                        llm_provider
                     )
                     futures.append((chunk_id, future))
             

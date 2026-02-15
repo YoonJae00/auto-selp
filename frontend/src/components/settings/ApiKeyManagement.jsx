@@ -75,6 +75,19 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
             ]
         },
         {
+            title: 'OpenAI API',
+            description: 'OpenAI ChatGPT API를 사용한 AI 상품명 가공 및 키워드 발굴',
+            apiType: 'openai',
+            fields: [
+                {
+                    key: 'openai_api_key',
+                    label: 'API 키',
+                    placeholder: 'sk-proj-...',
+                    type: 'password'
+                }
+            ]
+        },
+        {
             title: 'Naver 광고 API',
             description: '네이버 광고 관리 시스템 API',
             apiType: 'naver_ad',
@@ -157,8 +170,8 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
 
                         {testResults[section.apiType] && (
                             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${testResults[section.apiType].success
-                                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                : 'bg-red-500/10 text-red-400 border border-red-500/20'
                                 }`}>
                                 {testResults[section.apiType].success ? (
                                     <>

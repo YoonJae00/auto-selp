@@ -4,34 +4,33 @@ import requests
 import hashlib
 import hmac
 import base64
-from typing import List
+from typing import List, Optional
 from curl_cffi import requests as cffi_requests
 from dotenv import load_dotenv
-import google.generativeai as genai
+from src.llm_provider import BaseLLMProvider, get_llm_provider
 
 load_dotenv()
 
 class KeywordProcessor:
-    def __init__(self):
+    def __init__(self, llm_provider: Optional[BaseLLMProvider] = None):
         # Naver Config
         self.naver_base_url = os.getenv("NAVER_API_BASE_URL", "https://api.naver.com")
         self.naver_api_key = os.getenv("NAVER_API_KEY")
         self.naver_secret_key = os.getenv("NAVER_SECRET_KEY")
         self.naver_customer_id = os.getenv("NAVER_CUSTOMER_ID")
         
-        # Gemini Config
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        if self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
-            self.model = genai.GenerativeModel('gemini-flash-latest')
+        # LLM Provider
+        if llm_provider is None:
+            # 기본값: Gemini 사용
+            self.llm_provider = get_llm_provider("gemini")
         else:
-            print("[WARNING] GEMINI_API_KEY not found in .env")
+            self.llm_provider = llm_provider
 
     def process_keywords(self, product_name: str, prompt_template: str = None) -> str:
         """
         통합 프로세스:
         1. 쿠팡/네이버 API로 연관 키워드 수집 (Seed)
-        2. Gemini로 소상공인 맞춤 필터링 (Filter)
+        2. LLM으로 소상공인 맞춤 필터링 (Filter)
         3. 최종 키워드 문자열 반환 (콤마 구분)
         """
         # Step 1: Seed Collection
@@ -40,7 +39,7 @@ class KeywordProcessor:
             return ""
             
         # Step 2: Filtering with LLM
-        filtered_keywords = self._filter_keywords_with_gemini(product_name, seed_keywords, prompt_template)
+        filtered_keywords = self._filter_keywords_with_llm(product_name, seed_keywords, prompt_template)
         
         return ", ".join(filtered_keywords)
 
@@ -54,9 +53,9 @@ class KeywordProcessor:
         print(f"총 {len(all_keywords)}개의 후보 키워드 수집됨.")
         return all_keywords
 
-    def _filter_keywords_with_gemini(self, product_name: str, keywords: List[str], prompt_template: str = None) -> List[str]:
-        """Gemini를 이용하여 경쟁력 있는 키워드만 선별"""
-        if not self.gemini_api_key or not keywords:
+    def _filter_keywords_with_llm(self, product_name: str, keywords: List[str], prompt_template: str = None) -> List[str]:
+        """LLM을 이용하여 경쟁력 있는 키워드만 선별"""
+        if not self.llm_provider.is_configured() or not keywords:
             return keywords[:5] # Fallback
 
         try:
@@ -87,16 +86,15 @@ class KeywordProcessor:
             # 템플릿 변수 치환
             prompt = prompt_template.replace("{{product_name}}", product_name).replace("{{keywords_str}}", keywords_str)
             
-            response = self.model.generate_content(prompt)
-            result = response.text.strip()
+            result = self.llm_provider.generate_content(prompt)
             
             # 후처리: 콤마로 분리 및 공백 제거
             filtered = [k.strip() for k in result.split(',') if k.strip()]
-            print(f"Gemini가 선별한 키워드({len(filtered)}개): {filtered}")
+            print(f"LLM이 선별한 키워드({len(filtered)}개): {filtered}")
             return filtered
 
         except Exception as e:
-            print(f"Gemini 키워드 필터링 중 오류: {e}")
+            print(f"LLM 키워드 필터링 중 오류: {e}")
             return keywords[:5]
 
     def _get_coupang_related_keywords(self, keyword: str) -> List[str]:

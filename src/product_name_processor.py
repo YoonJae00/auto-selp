@@ -1,26 +1,32 @@
 import os
-import google.generativeai as genai
 from dotenv import load_dotenv
+from typing import Optional
+from src.llm_provider import BaseLLMProvider, get_llm_provider
 
 load_dotenv()
 
 class ProductNameProcessor:
-    def __init__(self):
-        self.api_key = os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
-            print("[WARNING] GEMINI_API_KEY not found in .env")
+    def __init__(self, llm_provider: Optional[BaseLLMProvider] = None):
+        """
+        ProductNameProcessor를 초기화합니다.
+        
+        Args:
+            llm_provider: LLM 제공자 인스턴스 (None이면 기본 Gemini 사용)
+        """
+        if llm_provider is None:
+            # 기본값: Gemini 사용
+            self.llm_provider = get_llm_provider("gemini")
         else:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-flash-latest')
+            self.llm_provider = llm_provider
 
     def refine_product_name(self, original_name: str, prompt_template: str = None) -> str:
         """
-        Gemini를 사용하여 상품명을 정제합니다.
+        LLM을 사용하여 상품명을 정제합니다.
         - 브랜드 제거
         - 수량/단위 표준화 (10p -> 10개, 1p -> 제거)
         - 검색 최적화
         """
-        if not self.api_key:
+        if not self.llm_provider.is_configured():
             return original_name + " (API키 없음)"
 
         try:
@@ -48,8 +54,7 @@ class ProductNameProcessor:
             # 템플릿 변수 치환
             prompt = prompt_template.replace("{{product_name}}", original_name)
             
-            response = self.model.generate_content(prompt)
-            cleaned_name = response.text.strip()
+            cleaned_name = self.llm_provider.generate_content(prompt)
             # 혹시 모를 따옴표 제거
             cleaned_name = cleaned_name.replace('"', '').replace("'", "")
             return cleaned_name
@@ -57,3 +62,4 @@ class ProductNameProcessor:
         except Exception as e:
             print(f"상품명 가공 중 오류 발생: {e}")
             return original_name
+

@@ -22,8 +22,26 @@ def decrypt_api_key(encrypted_key: str) -> str:
     if not encrypted_key:
         return ""
     try:
-        return cipher.decrypt(encrypted_key.encode()).decode()
-    except Exception:
+        decrypted = cipher.decrypt(encrypted_key.encode()).decode()
+        
+        # 복호화 결과 검증
+        print(f"[DEBUG] 복호화 성공: 원본 길이={len(encrypted_key)}, 복호화 후 길이={len(decrypted)}")
+        print(f"[DEBUG] 복호화된 키 앞부분: {decrypted[:10] if len(decrypted) >= 10 else decrypted}...")
+        
+        # ASCII 검증
+        try:
+            decrypted.encode('ascii')
+            print(f"[DEBUG] ASCII 검증 통과")
+        except UnicodeEncodeError as e:
+            print(f"[WARNING] 복호화된 API 키에 비-ASCII 문자 포함: {e}")
+            print(f"[DEBUG] 원본 repr: {repr(decrypted)}")
+            # 비-ASCII 문자 제거
+            decrypted = ''.join(char for char in decrypted if ord(char) < 128).strip()
+            print(f"[INFO] 비-ASCII 문자 제거 후: {decrypted[:10]}...")
+        
+        return decrypted
+    except Exception as e:
+        print(f"[ERROR] API 키 복호화 실패: {e}")
         return ""
 
 def get_user_setting(supabase, user_id: str, setting_key: str) -> Optional[any]:
@@ -63,6 +81,7 @@ def get_user_api_key(supabase, user_id: str, key_name: str) -> str:
     # 환경변수 매핑
     env_key_map = {
         "gemini_api_key": "GEMINI_API_KEY",
+        "openai_api_key": "OPENAI_API_KEY",
         "naver_api_key": "NAVER_API_KEY",
         "naver_secret_key": "NAVER_SECRET_KEY",
         "naver_customer_id": "NAVER_CUSTOMER_ID",
