@@ -153,6 +153,8 @@ const JobDetail = () => {
     const rowsProcessed = metaData.rows_processed || 0;
     const currentStep = metaData.current_step;
     const estimatedSeconds = metaData.estimated_completion_seconds || 0;
+    const chunks = metaData.chunks || [];
+    const parallelCount = metaData.parallel_count || 1;
 
     return (
         <Layout>
@@ -301,6 +303,65 @@ const JobDetail = () => {
                         </div>
                     </Card>
                 </div>
+
+                {/* Chunk Progress Section */}
+                {parallelCount > 1 && chunks.length > 0 && (
+                    <Card className="border-border shadow-sm">
+                        <h3 className="text-lg font-semibold text-foreground mb-4">병렬 처리 상태</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                            {chunks.map((chunk) => {
+                                const chunkStatusColors = {
+                                    pending: 'border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-500/5',
+                                    processing: 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/5',
+                                    completed: 'border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/5',
+                                };
+
+                                const chunkStatusIcons = {
+                                    pending: '⏳',
+                                    processing: '🔄',
+                                    completed: '✅',
+                                };
+
+                                return (
+                                    <motion.div
+                                        key={chunk.id}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className={cn(
+                                            "border rounded-lg p-3",
+                                            chunkStatusColors[chunk.status] || chunkStatusColors.pending
+                                        )}
+                                    >
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-medium text-foreground">
+                                                청크 #{chunk.id + 1}
+                                            </span>
+                                            <span className="text-sm">
+                                                {chunkStatusIcons[chunk.status] || chunkStatusIcons.pending}
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-muted rounded-full h-1.5 mb-2">
+                                            <motion.div
+                                                className="bg-primary h-1.5 rounded-full"
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${chunk.progress || 0}%` }}
+                                                transition={{ duration: 0.3 }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-muted-foreground">
+                                                {chunk.rows_processed || 0}/{chunk.total_rows || 0}
+                                            </span>
+                                            <span className="text-xs text-foreground font-medium">
+                                                {chunk.progress || 0}%
+                                            </span>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    </Card>
+                )}
 
                 {/* Column Mapping Card */}
                 {metaData.column_mapping && (

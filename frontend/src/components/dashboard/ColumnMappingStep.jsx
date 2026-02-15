@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ChevronDown, FileSpreadsheet, ArrowLeft, Save, CheckCircle } from 'lucide-react';
+import { ChevronDown, FileSpreadsheet, ArrowLeft, Save, CheckCircle, Settings } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { cn } from '../../lib/utils';
 import api from '../../lib/api';
@@ -28,6 +28,8 @@ export const ColumnMappingStep = ({ previewData, onSubmit, onBack, fileName }) =
     });
     const [error, setError] = useState('');
     const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [parallelCount, setParallelCount] = useState(1);
 
     // 설정 불러오기
     const { data: settings, isLoading: isLoadingSettings } = useQuery({
@@ -71,7 +73,7 @@ export const ColumnMappingStep = ({ previewData, onSubmit, onBack, fileName }) =
             return;
         }
         setError('');
-        onSubmit(mapping);
+        onSubmit(mapping, parallelCount);
     };
 
     const handleColumnSelect = (field, value) => {
@@ -314,6 +316,58 @@ export const ColumnMappingStep = ({ previewData, onSubmit, onBack, fileName }) =
                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
                     </div>
                 </div>
+            </div>
+
+            {/* Advanced Settings */}
+            <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+                <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
+                >
+                    <div className="flex items-center gap-2">
+                        <Settings className="w-5 h-5 text-primary" />
+                        <span className="font-medium text-foreground">고급 설정</span>
+                    </div>
+                    <ChevronDown className={cn(
+                        "w-5 h-5 text-muted-foreground transition-transform",
+                        showAdvanced && "rotate-180"
+                    )} />
+                </button>
+
+                {showAdvanced && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="border-t border-border p-4 space-y-3"
+                    >
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                                병렬 처리 개수
+                            </label>
+                            <p className="text-xs text-muted-foreground mb-3">
+                                작업을 여러 개로 나누어 동시에 처리합니다. 숫자가 클수록 빠르지만 서버 부하가 증가합니다.
+                            </p>
+                            <div className="flex items-center gap-4">
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="10"
+                                    value={parallelCount}
+                                    onChange={(e) => setParallelCount(parseInt(e.target.value))}
+                                    className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                                />
+                                <div className="w-12 h-10 flex items-center justify-center bg-primary/10 text-primary font-bold rounded-lg">
+                                    {parallelCount}
+                                </div>
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                <span>느림 (1개)</span>
+                                <span>빠름 (10개)</span>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
             </div>
 
             {/* Error Message */}

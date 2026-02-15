@@ -26,9 +26,26 @@ class CategoryProcessor:
             return {}
             
         try:
-            # A열: 네이버 카테고리명, B열: 내 코드 라고 가정
-            df = pd.read_excel(self.mapping_file_path, header=0)
-            mapping = dict(zip(df.iloc[:, 0], df.iloc[:, 1]))
+            # 엑셀 파일 로드 (파일명: naver_category_mapping.xls)
+            # 컬럼: 카테고리번호, 대분류, 중분류, 소분류, 세분류
+            df = pd.read_excel(self.mapping_file_path)
+            
+            mapping = {}
+            for _, row in df.iterrows():
+                # 각 분류 컬럼을 가져와서 깨끗하게 정리
+                parts = []
+                for col in ['대분류', '중분류', '소분류', '세분류']:
+                    val = row.get(col)
+                    if pd.notna(val) and str(val).strip():
+                        parts.append(str(val).strip())
+                
+                if parts:
+                    full_path = ">".join(parts)
+                    # 카테고리번호는 숫자인 경우가 많으므로 문자로 변환
+                    code = str(row.get('카테고리번호', '')).strip()
+                    if code:
+                        mapping[full_path] = code
+            
             print(f"카테고리 매핑 {len(mapping)}개 로드 완료")
             return mapping
         except Exception as e:
@@ -40,19 +57,31 @@ class CategoryProcessor:
         # 1. 네이버 쇼핑 API로 카테고리 찾기
         naver_cat = self._search_naver_category(product_name)
         if not naver_cat:
-            return "매핑실패"
+            return "매핑실패(검색불가)"
             
         # 2. 매핑 테이블에서 코드 찾기
-        # 전체 일치
+        # naver_cat 예: "디지털/가전>휴대폰악세서리>휴대폰케이스>아이폰케이스"
+        
+        # 완전 일치 시도
         if naver_cat in self.category_mapping:
-            return str(self.category_mapping[naver_cat])
+            return self.category_mapping[naver_cat]
             
-        # 부분 일치 (마지막 깊이 카테고리만 비교)
-        last_cat = naver_cat.split(">")[-1].strip()
-        for k, v in self.category_mapping.items():
-            if str(k).endswith(last_cat):
-                return str(v)
-                
+        # 부분 일치 시도 (세분류부터 역순으로 시도하거나, 혹은 포함 여부 확인)
+        # 하지만 엑셀 매핑이 정확하다면 full path가 일치해야 하는 것이 원칙입니다.
+        # 예외적으로 네이버 API가 주는 카테고리 명칭과 엑셀의 명칭이 미세하게 다를 수 있으므로
+        # 가장 마지막 카테고리(세분류)가 일치하는 것을 찾습니다.
+        
+        target_last_cat = naver_cat.split(">")[-1].strip()
+        
+        for path, code in self.category_mapping.items():
+            path_last_cat = path.split(">")[-1].strip()
+            if path_last_cat == target_last_cat:
+                 # 주의: 마지막 카테고리명이 중복될 수 있음 (예: '기타'). 
+                 # 이 경우 상위 카테고리까지 비교하면 좋겠지만, 
+                 # 일단은 단순화하여 마지막이 같으면 반환하거나, 
+                 # 혹은 '확인필요'로 넘길 수 있습니다.
+                 return code
+
         return f"확인필요({naver_cat})"
 
     def _search_naver_category(self, query: str) -> str:

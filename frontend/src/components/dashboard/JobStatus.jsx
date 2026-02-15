@@ -23,7 +23,9 @@ export const JobStatus = ({ jobId }) => {
     if (isError) return <div className="text-red-400">Error loading status: {error.message}</div>;
     if (!data) return null;
 
-    const { status, progress, error_message } = data;
+    const { status, progress, error_message, meta_data } = data;
+    const chunks = meta_data?.chunks || [];
+    const parallelCount = meta_data?.parallel_count || 1;
 
     const statusColors = {
         pending: 'text-yellow-400 bg-yellow-400/10',
@@ -97,6 +99,62 @@ export const JobStatus = ({ jobId }) => {
                     <span>진행률</span>
                     <span>{progress || 0}%</span>
                 </div>
+
+                {/* Chunk Progress Grid */}
+                {parallelCount > 1 && chunks.length > 0 && (
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-300 mb-3 font-medium">병렬 처리 상태</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                            {chunks.map((chunk) => {
+                                const chunkStatusColors = {
+                                    pending: 'border-yellow-500/30 bg-yellow-500/5',
+                                    processing: 'border-blue-500/30 bg-blue-500/5',
+                                    completed: 'border-green-500/30 bg-green-500/5',
+                                };
+
+                                const chunkStatusIcons = {
+                                    pending: '⏳',
+                                    processing: '🔄',
+                                    completed: '✅',
+                                };
+
+                                return (
+                                    <motion.div
+                                        key={chunk.id}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className={`border rounded-lg p-3 ${chunkStatusColors[chunk.status] || chunkStatusColors.pending}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-medium text-gray-300">
+                                                청크 #{chunk.id + 1}
+                                            </span>
+                                            <span className="text-sm">
+                                                {chunkStatusIcons[chunk.status] || chunkStatusIcons.pending}
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-700/50 rounded-full h-1.5 mb-2">
+                                            <motion.div
+                                                className="bg-indigo-400 h-1.5 rounded-full"
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${chunk.progress || 0}%` }}
+                                                transition={{ duration: 0.3 }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-gray-400">
+                                                {chunk.rows_processed || 0}/{chunk.total_rows || 0}
+                                            </span>
+                                            <span className="text-xs text-gray-400 font-medium">
+                                                {chunk.progress || 0}%
+                                            </span>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {status === 'completed' && (
                     <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">

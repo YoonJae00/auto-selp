@@ -59,6 +59,7 @@ def preview_excel(
 def create_job(
     file: UploadFile = File(...),
     column_mapping: str = Form(...),  # JSON string
+    parallel_count: int = Form(1),  # Number of parallel workers (1-10)
     user = Depends(get_current_user)
 ):
     """
@@ -73,7 +74,12 @@ def create_job(
                 "keyword": "E", 
                 "category": "F"
             }
+        parallel_count: 병렬 처리 작업 수 (1-10, 기본값: 1)
     """
+    # Validate parallel_count
+    if parallel_count < 1 or parallel_count > 10:
+        raise HTTPException(status_code=400, detail="parallel_count must be between 1 and 10")
+    
     # 1. Save File Locally
     file_id = str(uuid.uuid4())
     ext = os.path.splitext(file.filename)[1]
@@ -94,7 +100,19 @@ def create_job(
         if field not in mapping or not mapping[field]:
             raise HTTPException(status_code=400, detail=f"{field} column is required")
 
-    # 3. Create Job in DB
+    # 3. Initialize chunks metadata
+    chunks = [
+        {
+            "id": i,
+            "status": "pending",
+            "progress": 0,
+            "rows_processed": 0,
+            "total_rows": 0
+        }
+        for i in range(parallel_count)
+    ]
+
+    # 4. Create Job in DB
     db = get_db()
     job_data = {
         "user_id": user.id,
@@ -103,13 +121,15 @@ def create_job(
         "progress": 0,
         "meta_data": {
             "original_filename": file.filename,
-            "column_mapping": mapping
+            "column_mapping": mapping,
+            "parallel_count": parallel_count,
+            "chunks": chunks
         }
     }
     res = db.table("jobs").insert(job_data).execute()
     job_id = res.data[0]['id']
 
-    # 4. Submit job to thread pool (non-blocking)
+    # 5. Submit job to thread pool (non-blocking)
     executor.submit(process_excel_job, job_id, user.id, file_path)
 
     return {"job_id": job_id, "status": "pending"}
