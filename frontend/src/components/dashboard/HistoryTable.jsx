@@ -85,8 +85,8 @@ export const HistoryTable = ({ onJobClick }) => {
     if (isLoading) {
         return (
             <div className="mt-8">
-                <h3 className="text-xl font-semibold text-white mb-4">최근 활동 내역</h3>
-                <div className="flex items-center justify-center py-12 text-gray-400">
+                <h3 className="text-xl font-semibold text-foreground mb-4">최근 활동 내역</h3>
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
                     <Loader2 className="w-6 h-6 animate-spin mr-2" />
                     로딩 중...
                 </div>
@@ -96,16 +96,16 @@ export const HistoryTable = ({ onJobClick }) => {
 
     return (
         <div className="mt-8">
-            <h3 className="text-xl font-semibold text-white mb-4">최근 활동 내역</h3>
+            <h3 className="text-xl font-semibold text-foreground mb-4">최근 활동 내역</h3>
 
             {!jobs || jobs.length === 0 ? (
-                <div className="text-center py-12 text-gray-400 bg-gray-950/40 rounded-xl border border-white/10">
+                <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
                     아직 처리한 작업이 없습니다.
                 </div>
             ) : (
-                <div className="overflow-hidden rounded-xl border border-white/10 bg-gray-950/40 backdrop-blur-sm">
-                    <table className="w-full text-left text-sm text-gray-400">
-                        <thead className="bg-white/5 uppercase text-xs font-semibold text-gray-300">
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                    <table className="w-full text-left text-sm text-muted-foreground">
+                        <thead className="bg-muted/50 uppercase text-xs font-semibold text-foreground">
                             <tr>
                                 <th className="px-6 py-4">파일명</th>
                                 <th className="px-6 py-4">상태</th>
@@ -114,7 +114,7 @@ export const HistoryTable = ({ onJobClick }) => {
                                 <th className="px-6 py-4 text-right">작업</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-border">
                             {jobs.map((job, index) => {
                                 const status = statusConfig[job.status] || statusConfig.pending;
                                 const Icon = status.icon;
@@ -126,11 +126,11 @@ export const HistoryTable = ({ onJobClick }) => {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: index * 0.05 }}
                                         onClick={() => handleRowClick(job.id)}
-                                        className="hover:bg-white/5 transition-colors cursor-pointer"
+                                        className="hover:bg-muted/50 transition-colors cursor-pointer"
                                     >
-                                        <td className="px-6 py-4 font-medium text-white">
+                                        <td className="px-6 py-4 font-medium text-foreground">
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+                                                <div className="p-2 rounded-lg bg-primary/10 text-primary">
                                                     <File className="w-4 h-4" />
                                                 </div>
                                                 <span className="max-w-[300px] truncate">
@@ -152,9 +152,9 @@ export const HistoryTable = ({ onJobClick }) => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
-                                                <div className="flex-1 bg-gray-700/50 rounded-full h-2 max-w-[100px]">
+                                                <div className="flex-1 bg-muted rounded-full h-2 max-w-[100px]">
                                                     <div
-                                                        className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
+                                                        className="bg-primary h-2 rounded-full transition-all duration-300"
                                                         style={{ width: `${job.progress || 0}%` }}
                                                     />
                                                 </div>
@@ -167,7 +167,7 @@ export const HistoryTable = ({ onJobClick }) => {
                                                 {job.status === 'completed' && (
                                                     <button
                                                         onClick={(e) => handleDownload(e, job.id)}
-                                                        className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+                                                        className="text-muted-foreground hover:text-foreground transition-colors p-2 hover:bg-muted rounded-lg"
                                                         title="다운로드"
                                                     >
                                                         <Download className="w-4 h-4" />
@@ -178,7 +178,7 @@ export const HistoryTable = ({ onJobClick }) => {
                                                         e.stopPropagation();
                                                         handleRowClick(job.id);
                                                     }}
-                                                    className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+                                                    className="text-muted-foreground hover:text-foreground transition-colors p-2 hover:bg-muted rounded-lg"
                                                     title="상세 보기"
                                                 >
                                                     <Eye className="w-4 h-4" />

@@ -3,7 +3,51 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+
+  /* Light Mode (기본값 - 개선된 화이트 모드) */
+  :root,
+  .light {
+    /* 배경색 - 밝은 회색 톤으로 대비 강화 */
+    --background: 0 0% 96%;
+    --foreground: 0 0% 9%;
+
+    /* 카드 - 순백색으로 배경과 구분 */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    /* Primary - 선명한 인디고 */
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - 중간 톤 그레이 */
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 15%;
+
+    /* Muted - 밝은 그레이 배경 */
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 40%;
+
+    /* Accent - 밝은 그레이 */
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 15%;
+
+    /* Destructive - 선명한 레드 */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border & Input - 명확한 그레이 */
+    --border: 0 0% 85%;
+    --input: 0 0% 85%;
+    --ring: 239 84% 67%;
+
+    --radius: 0.5rem;
+  }
+
+  /* Dark Mode (기존 다크 테마 유지) */
+  .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
@@ -40,7 +84,8 @@
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-300;
   }
 }

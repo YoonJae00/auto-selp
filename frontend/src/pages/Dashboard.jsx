@@ -23,8 +23,8 @@ const Dashboard = () => {
                 className="space-y-8"
             >
                 <div>
-                    <h1 className="text-3xl font-bold text-white">대시보드</h1>
-                    <p className="text-gray-400 mt-2">엑셀 파일을 업로드하여 처리를 시작하세요.</p>
+                    <h1 className="text-3xl font-bold text-foreground">대시보드</h1>
+                    <p className="text-muted-foreground mt-2">엑셀 파일을 업로드하여 처리를 시작하세요.</p>
                 </div>
 
                 <UploadZone onUploadSuccess={handleUploadSuccess} />

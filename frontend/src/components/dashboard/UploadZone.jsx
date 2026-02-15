@@ -115,9 +115,9 @@ export const UploadZone = ({ onUploadSuccess }) => {
                 className={cn(
                     "relative group border-2 border-dashed rounded-2xl p-10 text-center transition-all duration-300 cursor-pointer overflow-hidden",
                     isDragActive
-                        ? "border-indigo-500 bg-indigo-500/10"
-                        : "border-white/10 hover:border-indigo-500/50 hover:bg-white/5",
-                    file ? "border-indigo-500/30 bg-indigo-500/5" : ""
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50 hover:bg-muted",
+                    file ? "border-primary/30 bg-primary/5" : ""
                 )}
             >
                 <input {...getInputProps()} />
@@ -134,14 +134,14 @@ export const UploadZone = ({ onUploadSuccess }) => {
                             exit={{ opacity: 0, y: -10 }}
                             className="space-y-4"
                         >
-                            <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform duration-300">
+                            <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform duration-300">
                                 <UploadCloud className="w-8 h-8" />
                             </div>
                             <div>
-                                <p className="text-lg font-medium text-white">
+                                <p className="text-lg font-medium text-foreground">
                                     {isDragActive ? "파일을 여기에 놓으세요" : "여기에 엑셀 파일을 드래그 앤 드롭하세요"}
                                 </p>
-                                <p className="text-sm text-gray-400 mt-1">
+                                <p className="text-sm text-muted-foreground mt-1">
                                     또는 클릭하여 파일 선택 (.xlsx, .xls)
                                 </p>
                             </div>
@@ -155,7 +155,7 @@ export const UploadZone = ({ onUploadSuccess }) => {
                             className="flex flex-col items-center gap-4"
                         >
                             <div className="relative">
-                                <div className="w-16 h-16 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-400 shadow-lg shadow-green-500/10">
+                                <div className="w-16 h-16 rounded-2xl bg-green-100 dark:bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-400 shadow-lg shadow-green-500/10">
                                     <FileSpreadsheet className="w-8 h-8" />
                                 </div>
                                 {!loading && !uploading && (
@@ -169,21 +169,21 @@ export const UploadZone = ({ onUploadSuccess }) => {
                             </div>
 
                             <div>
-                                <p className="font-medium text-white">{file.name}</p>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="font-medium text-foreground">{file.name}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
                                     {(file.size / 1024 / 1024).toFixed(2)} MB
                                 </p>
                             </div>
 
                             {(loading || uploading) && (
-                                <div className="flex items-center gap-2 text-indigo-400 text-sm">
+                                <div className="flex items-center gap-2 text-primary text-sm">
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                     <span>{loading ? '미리보기 로딩 중...' : '업로드 처리 중...'}</span>
                                 </div>
                             )}
 
                             {error && (
-                                <p className="text-red-400 text-sm bg-red-500/10 px-3 py-1 rounded-full">
+                                <p className="text-destructive text-sm bg-destructive/10 px-3 py-1 rounded-full">
                                     {error}
                                 </p>
                             )}
