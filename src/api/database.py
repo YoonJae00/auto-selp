@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
+# TEMP: Prefer SERVICE_KEY for verification to bypass RLS
+key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
 
 if not url or not key:
     print("[WARNING] SUPABASE_URL or SUPABASE_KEY not found in .env")

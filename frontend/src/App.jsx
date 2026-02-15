@@ -5,6 +5,7 @@ import { supabase } from './lib/supabase';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Prompts from './pages/Prompts';
+import JobDetail from './pages/JobDetail';
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ function App() {
                                 <Routes>
                                     <Route path="/" element={<Dashboard />} />
                                     <Route path="/prompts" element={<Prompts />} />
+                                    <Route path="/job/:jobId" element={<JobDetail />} />
                                     <Route path="*" element={<Navigate to="/" replace />} />
                                 </Routes>
                             </ProtectedRoute>

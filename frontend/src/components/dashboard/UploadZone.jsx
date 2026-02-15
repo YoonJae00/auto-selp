@@ -1,18 +1,21 @@
 import { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone'; // need to install this
+import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadCloud, FileSpreadsheet, X, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { cn } from '../../lib/utils';
 import api from '../../lib/api';
+import { ColumnMappingStep } from './ColumnMappingStep';
 
 export const UploadZone = ({ onUploadSuccess }) => {
     const [file, setFile] = useState(null);
+    const [step, setStep] = useState('upload'); // 'upload' | 'mapping'
+    const [previewData, setPreviewData] = useState(null);
     const [uploading, setUploading] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const onDrop = useCallback((acceptedFiles) => {
-        // Only accept one file for now
         if (acceptedFiles?.length > 0) {
             setFile(acceptedFiles[0]);
             setError(null);
@@ -29,7 +32,30 @@ export const UploadZone = ({ onUploadSuccess }) => {
         multiple: false
     });
 
-    const handleUpload = async () => {
+    const handlePreview = async () => {
+        if (!file) return;
+
+        setLoading(true);
+        setError(null);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const { data } = await api.post('/api/jobs/preview', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setPreviewData(data);
+            setStep('mapping');
+        } catch (err) {
+            console.error(err);
+            setError('파일 미리보기 실패. 올바른 엑셀 파일인지 확인해주세요.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUploadWithMapping = async (mapping) => {
         if (!file) return;
 
         setUploading(true);
@@ -37,27 +63,51 @@ export const UploadZone = ({ onUploadSuccess }) => {
 
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('column_mapping', JSON.stringify(mapping));
 
         try {
             const { data } = await api.post('/api/jobs/', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            // Reset after success
+
+            // Reset state
             setFile(null);
+            setStep('upload');
+            setPreviewData(null);
+
             if (onUploadSuccess) onUploadSuccess(data);
         } catch (err) {
             console.error(err);
-            setError('업로드 실패. 다시 시도해주세요.');
+            setError(err.response?.data?.detail || '업로드 실패. 다시 시도해주세요.');
         } finally {
             setUploading(false);
         }
     };
 
+    const handleBackToUpload = () => {
+        setStep('upload');
+        setPreviewData(null);
+    };
+
     const removeFile = (e) => {
         e.stopPropagation();
         setFile(null);
+        setError(null);
     };
 
+    // Show column mapping step
+    if (step === 'mapping' && previewData) {
+        return (
+            <ColumnMappingStep
+                previewData={previewData}
+                fileName={file?.name}
+                onSubmit={handleUploadWithMapping}
+                onBack={handleBackToUpload}
+            />
+        );
+    }
+
+    // Show upload step
     return (
         <div className="w-full">
             <div
@@ -108,7 +158,7 @@ export const UploadZone = ({ onUploadSuccess }) => {
                                 <div className="w-16 h-16 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-400 shadow-lg shadow-green-500/10">
                                     <FileSpreadsheet className="w-8 h-8" />
                                 </div>
-                                {!uploading && (
+                                {!loading && !uploading && (
                                     <button
                                         onClick={removeFile}
                                         className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition shadow-md"
@@ -125,10 +175,10 @@ export const UploadZone = ({ onUploadSuccess }) => {
                                 </p>
                             </div>
 
-                            {uploading && (
+                            {(loading || uploading) && (
                                 <div className="flex items-center gap-2 text-indigo-400 text-sm">
                                     <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>업로드 처리 중...</span>
+                                    <span>{loading ? '미리보기 로딩 중...' : '업로드 처리 중...'}</span>
                                 </div>
                             )}
 
@@ -143,7 +193,7 @@ export const UploadZone = ({ onUploadSuccess }) => {
             </div>
 
             <AnimatePresence>
-                {file && !uploading && (
+                {file && !loading && !uploading && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -153,12 +203,12 @@ export const UploadZone = ({ onUploadSuccess }) => {
                         <Button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                handleUpload();
+                                handlePreview();
                             }}
                             className="w-full sm:w-auto shadow-indigo-500/20"
                             size="lg"
                         >
-                            자동화 작업 시작
+                            다음 단계 →
                         </Button>
                     </motion.div>
                 )}
@@ -166,3 +216,4 @@ export const UploadZone = ({ onUploadSuccess }) => {
         </div>
     );
 };
+

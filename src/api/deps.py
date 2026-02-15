@@ -2,14 +2,19 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from src.api.database import get_db
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Supabase Auth (JWT) 검증 및 사용자 ID 반환.
-    실제 검증은 Supabase Client가 하거나, 여기서 JWT 디코딩을 수행할 수 있음.
-    여기서는 간단히 토큰 유무만 확인하고 Supabase의 getUser를 호출하는 방식 사용 권장.
     """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token = credentials.credentials
     db = get_db()
     
@@ -21,14 +26,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
     try:
         # Supabase-py의 auth.get_user(token) 사용
-        user = db.auth.get_user(token)
-        if not user:
+        user_response = db.auth.get_user(token)
+        if not user_response or not user_response.user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return user.user
+        return user_response.user
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
