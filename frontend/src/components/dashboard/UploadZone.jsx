@@ -55,7 +55,7 @@ export const UploadZone = ({ onUploadSuccess }) => {
         }
     };
 
-    const handleUploadWithMapping = async (mapping, parallelCount = 1) => {
+    const handleUploadWithMapping = async (mapping, parallelCount = 1, processingOptions = null) => {
         if (!file) return;
 
         setUploading(true);
@@ -65,6 +65,9 @@ export const UploadZone = ({ onUploadSuccess }) => {
         formData.append('file', file);
         formData.append('column_mapping', JSON.stringify(mapping));
         formData.append('parallel_count', parallelCount.toString());
+        if (processingOptions) {
+            formData.append('processing_options', JSON.stringify(processingOptions));
+        }
 
         try {
             const { data } = await api.post('/api/jobs/', formData, {

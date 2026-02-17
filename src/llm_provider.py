@@ -50,7 +50,7 @@ class GeminiProvider(BaseLLMProvider):
         
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-flash-latest')
+            self.model = genai.GenerativeModel('gemini-2.0-flash')
         else:
             self.model = None
             print("[WARNING] GEMINI_API_KEY not found")
@@ -60,11 +60,19 @@ class GeminiProvider(BaseLLMProvider):
         if not self.is_configured():
             raise ValueError("Gemini API key is not configured")
         
-        try:
-            response = self.model.generate_content(prompt)
-            return response.text.strip()
-        except Exception as e:
-            raise Exception(f"Gemini 컨텐츠 생성 중 오류: {e}")
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.model.generate_content(prompt)
+                return response.text.strip()
+            except Exception as e:
+                if "429" in str(e) and attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 5  # 5s, 10s, 15s
+                    print(f"[WARNING] Gemini Qualta Exceeded. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                raise Exception(f"Gemini 컨텐츠 생성 중 오류: {e}")
     
     def is_configured(self) -> bool:
         """Gemini API 키가 설정되어 있는지 확인합니다."""
@@ -74,7 +82,7 @@ class GeminiProvider(BaseLLMProvider):
 class OpenAIProvider(BaseLLMProvider):
     """OpenAI ChatGPT LLM 제공자"""
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-5-nano"):
         """
         OpenAI Provider를 초기화합니다.
         
@@ -151,8 +159,6 @@ class OpenAIProvider(BaseLLMProvider):
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.7,
-                max_tokens=1000
             )
             return response.choices[0].message.content.strip()
         except UnicodeEncodeError as e:
@@ -196,7 +202,7 @@ def get_llm_provider(
     if provider_type == "gemini":
         return GeminiProvider(api_key=api_key)
     elif provider_type == "openai":
-        return OpenAIProvider(api_key=api_key, model=model or "gpt-4o-mini")
+        return OpenAIProvider(api_key=api_key, model=model or "gpt-5-nano")
     else:
         raise ValueError(f"지원하지 않는 LLM 제공자: {provider_type}")
 

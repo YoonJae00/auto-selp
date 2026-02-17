@@ -88,6 +88,8 @@ def get_user_api_key(supabase, user_id: str, key_name: str) -> str:
         "naver_client_id": "NAVER_CLIENT_ID",
         "naver_client_secret": "NAVER_CLIENT_SECRET",
         "nano_banana_api_key": "NANO_BANANA_API_KEY",
+        "coupang_access_key": "Coupang_Access_Key",
+        "coupang_secret_key": "Coupang_Secret_Key",
     }
     
     # 사용자 설정에서 조회
@@ -101,7 +103,8 @@ def get_user_api_key(supabase, user_id: str, key_name: str) -> str:
     # 폴백: 환경변수
     env_var = env_key_map.get(key_name)
     if env_var:
-        return os.getenv(env_var, "")
+        val = os.getenv(env_var, "")
+        if val: return val
     
     return ""
 

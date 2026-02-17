@@ -4,16 +4,27 @@ import requests
 import hashlib
 import hmac
 import base64
-from typing import List, Optional
+import re
+from typing import List, Optional, Dict, Tuple
 from curl_cffi import requests as cffi_requests
 from dotenv import load_dotenv
 from src.llm_provider import BaseLLMProvider, get_llm_provider
+from src.trademark_blacklist import contains_trademark, filter_trademarked_keywords
 
 load_dotenv()
 
 class KeywordProcessor:
+    """
+    강화된 키워드 프로세서.
+    
+    3-Phase 워크플로우:
+        Phase 1: 다각도 시드(Seed) 수집 - 상품명 변형 + 다회 검색
+        Phase 2: 경쟁도 기반 필터링 - 네이버 API 데이터 활용
+        Phase 3: 상표권 이중 검증 + LLM 최종 큐레이션
+    """
+    
     def __init__(self, llm_provider: Optional[BaseLLMProvider] = None):
-        # Naver Config
+        # Naver Ad API Config (검색광고 API)
         self.naver_base_url = os.getenv("NAVER_API_BASE_URL", "https://api.naver.com")
         self.naver_api_key = os.getenv("NAVER_API_KEY")
         self.naver_secret_key = os.getenv("NAVER_SECRET_KEY")
@@ -21,114 +32,392 @@ class KeywordProcessor:
         
         # LLM Provider
         if llm_provider is None:
-            # 기본값: Gemini 사용
             self.llm_provider = get_llm_provider("gemini")
         else:
             self.llm_provider = llm_provider
 
+    # ============================================================
+    # Public API (기존 시그니처 유지)
+    # ============================================================
+
     def process_keywords(self, product_name: str, prompt_template: str = None) -> str:
         """
-        통합 프로세스:
-        1. 쿠팡/네이버 API로 연관 키워드 수집 (Seed)
-        2. LLM으로 소상공인 맞춤 필터링 (Filter)
-        3. 최종 키워드 문자열 반환 (콤마 구분)
-        """
-        # Step 1: Seed Collection
-        seed_keywords = self._collect_seed_keywords(product_name)
-        if not seed_keywords:
-            return ""
+        강화된 키워드 생성 워크플로우.
+        
+        Args:
+            product_name: 가공된 상품명
+            prompt_template: (옵션) 사용자 커스텀 프롬프트 (최종 큐레이션용)
             
-        # Step 2: Filtering with LLM
-        filtered_keywords = self._filter_keywords_with_llm(product_name, seed_keywords, prompt_template)
+        Returns:
+            콤마로 구분된 키워드 문자열
+        """
+        print(f"\n{'='*60}")
+        print(f"[키워드 생성 시작] 상품명: {product_name}")
+        print(f"{'='*60}")
         
-        return ", ".join(filtered_keywords)
-
-    def _collect_seed_keywords(self, keyword: str) -> List[str]:
-        """쿠팡 + 네이버 API를 통해 후보 키워드 수집"""
-        coupang_keywords = self._get_coupang_related_keywords(keyword)
-        naver_keywords = self._get_naver_api_keywords(keyword)
+        # ── Phase 1: 다각도 시드 수집 ──
+        print("\n📌 Phase 1: 다각도 시드 수집")
+        seed_keywords_with_data = self._collect_seeds_multi_round(product_name)
         
-        # 중복 제거
-        all_keywords = list(set(coupang_keywords + naver_keywords))
-        print(f"총 {len(all_keywords)}개의 후보 키워드 수집됨.")
-        return all_keywords
+        if not seed_keywords_with_data:
+            print("⚠️ 시드 키워드를 수집하지 못했습니다.")
+            return ""
+        
+        print(f"   → 총 {len(seed_keywords_with_data)}개 후보 키워드 수집 완료")
+        
+        # ── Phase 2: 경쟁도 기반 필터링 ──
+        print("\n📌 Phase 2: 경쟁도 기반 필터링")
+        filtered_keywords = self._filter_by_competition(seed_keywords_with_data)
+        print(f"   → 필터링 후 {len(filtered_keywords)}개 키워드 생존")
+        
+        if not filtered_keywords:
+            # 필터링 후 너무 적으면 경쟁도 필터 완화 (키워드명만이라도 사용)
+            print("   ⚠️ 경쟁도 필터 결과가 너무 적어 원본 키워드명을 사용합니다.")
+            filtered_keywords = [
+                {"keyword": item["keyword"], "compIdx": "불명", "totalQcCnt": 0}
+                for item in seed_keywords_with_data
+            ]
+        
+        # ── Phase 3: 상표권 검증 + LLM 큐레이션 ──
+        print("\n📌 Phase 3: 상표권 검증 + LLM 큐레이션")
+        final_keywords = self._finalize_keywords(product_name, filtered_keywords, prompt_template)
+        
+        print(f"\n{'='*60}")
+        print(f"[결과] 최종 키워드 ({len(final_keywords)}개): {final_keywords}")
+        print(f"{'='*60}\n")
+        
+        return ", ".join(final_keywords)
 
-    def _filter_keywords_with_llm(self, product_name: str, keywords: List[str], prompt_template: str = None) -> List[str]:
-        """LLM을 이용하여 경쟁력 있는 키워드만 선별"""
-        if not self.llm_provider.is_configured() or not keywords:
-            return keywords[:5] # Fallback
+    # ============================================================
+    # Phase 1: 다각도 시드 수집
+    # ============================================================
 
+    def _collect_seeds_multi_round(self, product_name: str) -> List[Dict]:
+        """
+        원본 상품명 + LLM 변형 상품명으로 다회 검색하여 시드 키워드를 수집합니다.
+        
+        Returns:
+            List[Dict]: [{"keyword": "...", "monthlyPcQcCnt": N, "monthlyMobileQcCnt": N, "compIdx": "높음/중간/낮음"}, ...]
+        """
+        all_keywords = {}  # keyword -> data dict (중복 제거용)
+        
+        # Round 1: 원본 상품명으로 검색
+        print(f"   [Round 1] 원본 상품명: '{product_name}'")
+        round1_results = self._search_naver_keywords_with_data(product_name)
+        round1_coupang = self._get_coupang_related_keywords(product_name)
+        
+        for item in round1_results:
+            all_keywords[item["keyword"]] = item
+        
+        # 쿠팡 키워드는 검색량 데이터 없이 키워드명만 추가
+        for kw in round1_coupang:
+            if kw not in all_keywords:
+                all_keywords[kw] = {"keyword": kw, "monthlyPcQcCnt": 0, "monthlyMobileQcCnt": 0, "compIdx": "불명"}
+        
+        print(f"      → {len(round1_results)}개 (네이버) + {len(round1_coupang)}개 (쿠팡)")
+        
+        # Round 2~3: LLM으로 상품명 변형 후 재검색
+        variations = self._generate_product_name_variations(product_name)
+        
+        for i, variation in enumerate(variations, start=2):
+            print(f"   [Round {i}] 변형 상품명: '{variation}'")
+            round_results = self._search_naver_keywords_with_data(variation)
+            round_coupang = self._get_coupang_related_keywords(variation)
+            
+            for item in round_results:
+                if item["keyword"] not in all_keywords:
+                    all_keywords[item["keyword"]] = item
+            
+            for kw in round_coupang:
+                if kw not in all_keywords:
+                    all_keywords[kw] = {"keyword": kw, "monthlyPcQcCnt": 0, "monthlyMobileQcCnt": 0, "compIdx": "불명"}
+            
+            print(f"      → {len(round_results)}개 (네이버) + {len(round_coupang)}개 (쿠팡)")
+        
+        return list(all_keywords.values())
+
+    def _generate_product_name_variations(self, product_name: str) -> List[str]:
+        """
+        LLM을 사용하여 상품명의 동의어/약칭/다른 관점 변형을 2~3개 생성합니다.
+        """
+        if not self.llm_provider.is_configured():
+            return []
+        
         try:
-            keywords_str = ", ".join(keywords)
-            # 기본 프롬프트 템플릿 (System Default)
-            if not prompt_template:
-                prompt_template = """
-                역할: 스마트스토어/쿠팡 전문 마케터
-                작업: 주어진 '후보 키워드 리스트'에서 소상공인 셀러가 판매하기 유리한 '알짜배기 키워드' 5~8개를 선별해주세요.
+            prompt = f"""역할: 온라인 쇼핑 키워드 전문가
+작업: 다음 상품명을 소비자가 검색할 수 있는 다른 표현으로 2~3개 변형해주세요.
 
-                상품명: {{product_name}}
+규칙:
+1. 동의어, 약칭, 다른 관점의 표현을 사용
+2. 브랜드명은 절대 포함하지 마세요
+3. 각 변형은 자연스러운 검색어 형태여야 합니다
+4. 결과만 출력 (한 줄에 하나씩, 번호 없이)
 
-                [필수 제거 조건] - 위반 시 절대 안됨
-                1. **상표권/대형 브랜드** 포함된 키워드 무조건 삭제 (예: 삼성, LG, 다이소, 이케아, 3M, 시즈맥스, 나이키 등).
-                2. 너무 광범위하고 경쟁이 치열한 '대형 키워드' 삭제 (예: 그냥 '의자', '책상', '수납함' 같은 단일 명사).
-                3. 상품과 관련 없는 키워드 삭제.
-
-                [선호 조건]
-                1. **세부 키워드(Long-tail)** 우선 (예: '투명 화장품 정리함', '원룸 책상 꾸미기').
-                2. 구매 전환율이 높을 것 같은 구체적인 키워드.
-
-                후보 키워드 리스트: [{{keywords_str}}]
-
-                결과 출력 형식:
-                키워드1, 키워드2, 키워드3, ... (콤마로만 구분하여 출력, 설명 없이)
-                """
-
-            # 템플릿 변수 치환
-            prompt = prompt_template.replace("{{product_name}}", product_name).replace("{{keywords_str}}", keywords_str)
+상품명: "{product_name}"
+변형:"""
             
             result = self.llm_provider.generate_content(prompt)
+            variations = [v.strip().strip('-').strip('•').strip() for v in result.strip().split('\n') if v.strip()]
+            # 최대 3개까지만
+            variations = variations[:3]
+            print(f"   [LLM] 상품명 변형 생성: {variations}")
+            return variations
             
-            # 후처리: 콤마로 분리 및 공백 제거
-            filtered = [k.strip() for k in result.split(',') if k.strip()]
-            print(f"LLM이 선별한 키워드({len(filtered)}개): {filtered}")
-            return filtered
-
         except Exception as e:
-            print(f"LLM 키워드 필터링 중 오류: {e}")
-            return keywords[:5]
+            print(f"   ⚠️ 상품명 변형 생성 실패: {e}")
+            return []
+
+    def _search_naver_keywords_with_data(self, keyword: str) -> List[Dict]:
+        """
+        네이버 검색광고 API로 연관 키워드 + 검색량/경쟁도 데이터를 함께 수집합니다.
+        
+        Returns:
+            List[Dict]: [{"keyword": "...", "monthlyPcQcCnt": N, "monthlyMobileQcCnt": N, "compIdx": "높음"}, ...]
+        """
+        if not (self.naver_api_key and self.naver_secret_key):
+            return []
+        
+        try:
+            uri = '/keywordstool'
+            method = 'GET'
+            # Naver API may reject keywords with spaces in some contexts or treat them as invalid.
+            # Removing spaces for the search query often helps for compound words in Korean.
+            clean_keyword = keyword.replace(" ", "")
+            params = {'hintKeywords': clean_keyword, 'showDetail': '1'}
+            headers = self._get_naver_header(method, uri)
+            resp = requests.get(self.naver_base_url + uri, params=params, headers=headers, timeout=10)
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                results = []
+                for item in data.get('keywordList', []):
+                    kw = item.get('relKeyword', '')
+                    if not kw:
+                        continue
+                    
+                    # 검색량 데이터 추출 (< 10 등 문자열일 수 있음)
+                    pc_qc = item.get('monthlyPcQcCnt', 0)
+                    mobile_qc = item.get('monthlyMobileQcCnt', 0)
+                    
+                    # "< 10" 같은 문자열 처리
+                    if isinstance(pc_qc, str):
+                        pc_qc = 5  # "< 10"의 경우 보수적으로 5로 처리
+                    if isinstance(mobile_qc, str):
+                        mobile_qc = 5
+                    
+                    results.append({
+                        "keyword": kw,
+                        "monthlyPcQcCnt": pc_qc,
+                        "monthlyMobileQcCnt": mobile_qc,
+                        "totalQcCnt": pc_qc + mobile_qc,
+                        "compIdx": item.get('compIdx', '불명'),  # 높음/중간/낮음
+                    })
+                return results
+            else:
+                try:
+                    error_msg = resp.json().get('message', 'Unknown Error')
+                    print(f"      ⚠️ 네이버 API 응답 오류 ({resp.status_code}): {error_msg}")
+                except:
+                    print(f"      ⚠️ 네이버 API 응답 오류 ({resp.status_code})")
+                return []
+        except Exception as e:
+            print(f"      ⚠️ 네이버 API 호출 실패: {e}")
+            return []
 
     def _get_coupang_related_keywords(self, keyword: str) -> List[str]:
-        # (기존 로직 유지)
+        """쿠팡 연관 검색어 수집"""
         try:
             base_url = "https://www.coupang.com/n-api/web-adapter/search"
             params = {"keyword": keyword}
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
             }
-            res = cffi_requests.get(base_url, params=params, headers=headers, impersonate="chrome124")
-            if res.status_code != 200: return []
+            res = cffi_requests.get(base_url, params=params, headers=headers, impersonate="chrome124", timeout=10)
+            if res.status_code != 200:
+                return []
             data = res.json()
             return [item.get("keyword") for item in data if item.get("keyword")]
-        except:
+        except Exception:
             return []
 
-    def _get_naver_api_keywords(self, keyword: str) -> List[str]:
-        # (기존 로직 유지)
-        if not (self.naver_api_key and self.naver_secret_key): return []
+    # ============================================================
+    # Phase 2: 경쟁도 기반 필터링
+    # ============================================================
+
+    def _filter_by_competition(self, keywords_data: List[Dict]) -> List[Dict]:
+        """
+        경쟁도와 검색량 데이터를 기반으로 소상공인에 적합한 키워드를 필터링합니다.
+        
+        필터링 기준:
+        - 경쟁도 "높음" 키워드 제거 (대기업 독점 영역)
+        - 단일 단어 키워드 제거 (너무 광범위)
+        - 롱테일 키워드(2단어 이상) 우선
+        """
+        filtered = []
+        removed_reasons = []
+        
+        for item in keywords_data:
+            kw = item["keyword"]
+            comp_idx = item.get("compIdx", "불명")
+            total_qc = item.get("totalQcCnt", 0)
+            
+            # 1. 경쟁도 "높음" 제거
+            if comp_idx == "높음":
+                removed_reasons.append(f"   🚫 '{kw}' → 경쟁도 높음")
+                continue
+            
+            # 2. 단일 글자 키워드 제거 (너무 광범위)
+            if len(kw.replace(" ", "")) <= 1:
+                removed_reasons.append(f"   🚫 '{kw}' → 너무 짧음")
+                continue
+            
+            # 3. 단일 단어이면서 2글자 이하인 경우 제거
+            words = kw.split()
+            if len(words) == 1 and len(kw) <= 2:
+                removed_reasons.append(f"   🚫 '{kw}' → 단일 짧은 단어")
+                continue
+            
+            # 롱테일 보너스 점수 계산
+            longtail_score = 0
+            if len(words) >= 3:
+                longtail_score = 2  # 3단어 이상
+            elif len(words) >= 2:
+                longtail_score = 1  # 2단어
+            
+            item["longtail_score"] = longtail_score
+            item["quality_score"] = longtail_score + (1 if comp_idx == "낮음" else 0)
+            
+            filtered.append(item)
+        
+        # 디버그: 제거된 키워드 일부 출력 (최대 10개)
+        if removed_reasons:
+            for reason in removed_reasons[:10]:
+                print(reason)
+            if len(removed_reasons) > 10:
+                print(f"   ... 외 {len(removed_reasons) - 10}개 추가 제거")
+        
+        # 품질 점수 기준 정렬 (높은 점수 우선)
+        filtered.sort(key=lambda x: x.get("quality_score", 0), reverse=True)
+        
+        return filtered
+
+    # ============================================================
+    # Phase 3: 상표권 검증 + LLM 최종 큐레이션
+    # ============================================================
+
+    def _finalize_keywords(self, product_name: str, keywords_data: List[Dict], prompt_template: str = None) -> List[str]:
+        """
+        상표권 이중 검증 + LLM 최종 큐레이션을 수행합니다.
+        """
+        keyword_names = [item["keyword"] for item in keywords_data]
+        
+        # ── Step 1: 상표권 블랙리스트 1차 필터 ──
+        safe_keywords, removed_keywords = filter_trademarked_keywords(keyword_names)
+        
+        if removed_keywords:
+            print(f"   [블랙리스트] {len(removed_keywords)}개 상표 키워드 제거: {removed_keywords[:5]}{'...' if len(removed_keywords) > 5 else ''}")
+        
+        print(f"   [블랙리스트] {len(safe_keywords)}개 키워드 통과")
+        
+        if not safe_keywords:
+            return []
+        
+        # 안전한 키워드에 대한 데이터 재매핑
+        safe_data = [item for item in keywords_data if item["keyword"] in safe_keywords]
+        
+        # ── Step 2: LLM 상표권 2차 검증 + 최종 큐레이션 ──
+        if not self.llm_provider.is_configured():
+            return safe_keywords[:10]
+        
+        final_keywords = self._curate_with_llm(product_name, safe_data, prompt_template)
+        
+        return final_keywords
+
+    def _curate_with_llm(self, product_name: str, keywords_data: List[Dict], prompt_template: str = None) -> List[str]:
+        """
+        LLM으로 상표권 2차 검증 + 최종 키워드 큐레이션을 동시에 수행합니다.
+        """
         try:
-            uri = '/keywordstool'
-            method = 'GET'
-            params = {'hintKeywords': keyword, 'showDetail': '1'}
-            headers = self._get_naver_header(method, uri)
-            resp = requests.get(self.naver_base_url + uri, params=params, headers=headers, timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                return [item.get('relKeyword') for item in data.get('keywordList', []) if item.get('relKeyword')]
-            return []
-        except:
-            return []
+            # 키워드 + 경쟁도 데이터를 함께 포맷
+            keyword_info_lines = []
+            for item in keywords_data:
+                kw = item["keyword"]
+                comp = item.get("compIdx", "불명")
+                total = item.get("totalQcCnt", 0)
+                keyword_info_lines.append(f"- {kw} (경쟁도: {comp}, 월 검색수: {total})")
+            
+            keywords_info = "\n".join(keyword_info_lines)
+            # gpt-5-nano is unstable. Use Simple Prompt + Retry Logic.
+            all_keyword_names = ", ".join([item["keyword"] for item in keywords_data])
+            
+            prompt_v1 = f"""Select 10 safe keywords from this list for '{product_name}'.
+List: {all_keyword_names}
+Return comma-separated string."""
+
+            prompt_v2 = f"""Extract 10 keywords for '{product_name}' from: {all_keyword_names}.
+Safety: No brands.
+Format: Comma separated."""
+
+            prompts = [prompt_v1, prompt_v2, prompt_v1] # Retry sequence
+            
+            final = []
+            
+            for attempt, attempt_prompt in enumerate(prompts):
+                if attempt > 0:
+                    print(f"   ⚠️ LLM Attempt {attempt+1} (Retrying)...")
+                
+                try:
+                    result = self.llm_provider.generate_content(attempt_prompt)
+                    # print(f"   [DEBUG] LLM Result: {result}") # Verbose debug
+                    
+                    if not result:
+                        continue
+                        
+                    # Normalize and split
+                    normalized = result.replace('\n', ',')
+                    candidates = [k.strip() for k in normalized.split(',') if k.strip()]
+                    
+                    # Filter trademarks
+                    temp_final = []
+                    for kw in candidates:
+                        # Basic cleanup
+                        kw = re.sub(r'^[\d+\.\-\*\•\s]+', '', kw).strip()
+                        if not kw: continue
+                        
+                        if contains_trademark(kw):
+                            # print(f"   ⚠️ Removed Brand: {kw}")
+                            pass
+                        else:
+                            temp_final.append(kw)
+                    
+                    if temp_final:
+                        final = temp_final
+                        break # Success
+                        
+                except Exception as e:
+                    print(f"   ⚠️ LLM Error: {e}")
+                    continue
+
+            # Fallback if all LLM attempts fail
+            if not final:
+                print("   ⚠️ LLM Failed all attempts. Using Top 10 by logic.")
+                # Simple logic fallback
+                final = [item["keyword"] for item in keywords_data[:10] if not contains_trademark(item["keyword"])]
+            
+            print(f"   [LLM] 최종 선별 ({len(final)}개): {final}")
+            return final
+            
+        except Exception as e:
+            print(f"   ⚠️ LLM 큐레이션 중 오류: {e}")
+            # Fallback: 상표 안전 키워드에서 상위 10개 반환
+            return [item["keyword"] for item in keywords_data[:10]]
+
+    # ============================================================
+    # 유틸리티
+    # ============================================================
 
     def _get_naver_header(self, method, uri):
+        """네이버 검색광고 API 인증 헤더 생성"""
         timestamp = str(round(time.time() * 1000))
         message = f"{timestamp}.{method}.{uri}"
         secret_key = self.naver_secret_key
@@ -142,7 +431,8 @@ class KeywordProcessor:
             "X-Signature": signature
         }
 
+
 if __name__ == "__main__":
-    # Test
+    # 테스트
     kp = KeywordProcessor()
-    print(kp.process_keywords("원룸 미니 건조대"))
+    print(kp.process_keywords("스텐 원형 빨래 건조대"))

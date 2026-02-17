@@ -28,6 +28,7 @@ class ExcelColumnMapping(BaseModel):
     refined_product_name: str = "B"
     keyword: str = "C"
     category: str = "D"
+    coupang_category: Optional[str] = None
 
 class ApiKeys(BaseModel):
     gemini_api_key: Optional[str] = None
@@ -245,11 +246,13 @@ async def test_api_connection(
                 timeout=10.0
             )
             
-            client = OpenAI(api_key=api_key, http_client=http_client)
+            client = OpenAI(api_key=api_key, http_client=http_client)            # 테스트 요청
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": "Hello, test connection"}],
-                max_tokens=10
+                model="gpt-5-nano",
+                messages=[
+                    {"role": "user", "content": "Hello"}
+                ],
+                max_completion_tokens=50
             )
             
             return {"success": True, "message": "OpenAI API 연결 성공"}
