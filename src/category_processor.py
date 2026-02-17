@@ -6,26 +6,29 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class CategoryProcessor:
-    def __init__(self, mapping_file_path: str = "mapping.xlsx"):
+    # Class-level cache for mapping data to avoid reloading heavily
+    _mapping_cache = {}
+
+    def __init__(self, mapping_file_path: str = "naver_category_mapping.xls"):
         self.naver_client_id = os.getenv("NAVER_API_KEY") # 검색 API ID (Client ID)
         self.naver_client_secret = os.getenv("NAVER_SECRET_KEY") # 검색 API Secret
-        
-        # 주의: 검색광고 API 키와 쇼핑 검색(Search) API 키는 다를 수 있음.
-        # 여기서는 .env에 NAVER_CLIENT_ID, NAVER_CLIENT_SECRET이 있다고 가정하거나
-        # 기존 키를 혼용해서 쓸 경우 헤더 설정을 맞춰야 함.
-        # User Provided Code uses X-Naver-Client-Id header, which implies Naver Search API (Developers).
-        # We need to ensure .env has these.
         
         self.mapping_file_path = mapping_file_path
         self.category_mapping = self._load_mapping_file()
 
     def _load_mapping_file(self):
-        """매핑 엑셀 파일을 로드하여 딕셔너리로 변환"""
+        """매핑 엑셀 파일을 로드하여 딕셔너리로 변환 (캐싱 적용)"""
         if not os.path.exists(self.mapping_file_path):
             print(f"[WARNING] 매핑 파일이 없습니다: {self.mapping_file_path}")
             return {}
             
+        # Check cache first
+        if self.mapping_file_path in CategoryProcessor._mapping_cache:
+            print(f"[CACHE] 매핑 파일 캐시 사용: {self.mapping_file_path}")
+            return CategoryProcessor._mapping_cache[self.mapping_file_path]
+            
         try:
+            print(f"[LOAD] 매핑 파일 로드 시작: {self.mapping_file_path}")
             # 엑셀 파일 로드 (파일명: naver_category_mapping.xls)
             # 컬럼: 카테고리번호, 대분류, 중분류, 소분류, 세분류
             df = pd.read_excel(self.mapping_file_path)
@@ -47,6 +50,9 @@ class CategoryProcessor:
                         mapping[full_path] = code
             
             print(f"카테고리 매핑 {len(mapping)}개 로드 완료")
+            
+            # Save to cache
+            CategoryProcessor._mapping_cache[self.mapping_file_path] = mapping
             return mapping
         except Exception as e:
             print(f"매핑 파일 로드 실패: {e}")
@@ -66,20 +72,12 @@ class CategoryProcessor:
         if naver_cat in self.category_mapping:
             return self.category_mapping[naver_cat]
             
-        # 부분 일치 시도 (세분류부터 역순으로 시도하거나, 혹은 포함 여부 확인)
-        # 하지만 엑셀 매핑이 정확하다면 full path가 일치해야 하는 것이 원칙입니다.
-        # 예외적으로 네이버 API가 주는 카테고리 명칭과 엑셀의 명칭이 미세하게 다를 수 있으므로
-        # 가장 마지막 카테고리(세분류)가 일치하는 것을 찾습니다.
-        
+        # 부분 일치 시도 (세분류부터 역순으로 시도)
         target_last_cat = naver_cat.split(">")[-1].strip()
         
         for path, code in self.category_mapping.items():
             path_last_cat = path.split(">")[-1].strip()
             if path_last_cat == target_last_cat:
-                 # 주의: 마지막 카테고리명이 중복될 수 있음 (예: '기타'). 
-                 # 이 경우 상위 카테고리까지 비교하면 좋겠지만, 
-                 # 일단은 단순화하여 마지막이 같으면 반환하거나, 
-                 # 혹은 '확인필요'로 넘길 수 있습니다.
                  return code
 
         return f"확인필요({naver_cat})"
