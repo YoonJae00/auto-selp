@@ -82,6 +82,9 @@ class KeywordProcessor:
         print("\n📌 Phase 3: 상표권 검증 + LLM 큐레이션")
         final_keywords = self._finalize_keywords(product_name, filtered_keywords, prompt_template)
         
+        # 최대 10개로 제한
+        final_keywords = final_keywords[:10]
+        
         print(f"\n{'='*60}")
         print(f"[결과] 최종 키워드 ({len(final_keywords)}개): {final_keywords}")
         print(f"{'='*60}\n")
