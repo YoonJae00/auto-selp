@@ -143,6 +143,25 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
                     type: 'password'
                 }
             ]
+        },
+        {
+            title: 'Coupang API',
+            description: '쿠팡 카테고리 추천을 위한 API (Open API)',
+            apiType: 'coupang',
+            fields: [
+                {
+                    key: 'coupang_access_key',
+                    label: 'Access Key',
+                    placeholder: 'Access Key를 입력하세요',
+                    type: 'password'
+                },
+                {
+                    key: 'coupang_secret_key',
+                    label: 'Secret Key',
+                    placeholder: 'Secret Key를 입력하세요',
+                    type: 'password'
+                }
+            ]
         }
     ];
 

@@ -37,8 +37,8 @@ export const LLMProviderSettings = ({ preferences, onChange, onSave, isSaving })
         {
             id: 'openai',
             name: 'OpenAI ChatGPT',
-            description: 'OpenAI의 GPT-4o-mini 모델 사용',
-            model: 'gpt-4o-mini',
+            description: 'OpenAI의 GPT-5-nano 모델 사용',
+            model: 'gpt-5-nano',
         },
     ];
 

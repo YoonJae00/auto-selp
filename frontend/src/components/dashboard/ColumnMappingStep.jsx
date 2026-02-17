@@ -24,7 +24,14 @@ export const ColumnMappingStep = ({ previewData, onSubmit, onBack, fileName }) =
         original_product_name: '',
         refined_product_name: '',
         keyword: '',
-        category: ''
+        category: '',
+        coupang_category: ''
+    });
+    const [processingOptions, setProcessingOptions] = useState({
+        refine_name: true,
+        keyword: true,
+        category: true,
+        coupang: true
     });
     const [error, setError] = useState('');
     const [showSaveSuccess, setShowSaveSuccess] = useState(false);
@@ -50,30 +57,38 @@ export const ColumnMappingStep = ({ previewData, onSubmit, onBack, fileName }) =
     // 설정 자동 로드
     useEffect(() => {
         if (settings?.excel_column_mapping) {
-            setMapping(settings.excel_column_mapping);
+            setMapping(prev => ({
+                ...prev,
+                ...settings.excel_column_mapping
+            }));
         }
     }, [settings]);
 
     const handleSubmit = () => {
-        // Validate: all fields are required
+        // Validate: all required fields based on options
         if (!mapping.original_product_name) {
             setError('원본 상품명 열은 필수입니다.');
             return;
         }
-        if (!mapping.refined_product_name) {
+        if (processingOptions.refine_name && !mapping.refined_product_name) {
             setError('가공된 상품명 열은 필수입니다.');
             return;
         }
-        if (!mapping.keyword) {
+        if (processingOptions.keyword && !mapping.keyword) {
             setError('키워드 열은 필수입니다.');
             return;
         }
-        if (!mapping.category) {
+        if (processingOptions.category && !mapping.category) {
             setError('카테고리 열은 필수입니다.');
             return;
         }
+        if (processingOptions.coupang && !mapping.coupang_category) {
+            setError('쿠팡 카테고리 열은 필수입니다.');
+            return;
+        }
         setError('');
-        onSubmit(mapping, parallelCount);
+        setError('');
+        onSubmit(mapping, parallelCount, processingOptions);
     };
 
     const handleColumnSelect = (field, value) => {
@@ -85,19 +100,16 @@ export const ColumnMappingStep = ({ previewData, onSubmit, onBack, fileName }) =
     };
 
     const handleSaveSettings = () => {
-        // 유효성 검사
-        if (!mapping.original_product_name || !mapping.refined_product_name ||
-            !mapping.keyword || !mapping.category) {
-            setError('모든 열을 선택해야 설정을 저장할 수 있습니다.');
-            return;
-        }
+        // 유효성 검사 (setting save can follow stricter rules or just save what exists)
+        // For simplicity, we save current state
         saveMutation.mutate(mapping);
     };
 
     const hasValidMapping = mapping.original_product_name &&
-        mapping.refined_product_name &&
-        mapping.keyword &&
-        mapping.category;
+        (!processingOptions.refine_name || mapping.refined_product_name) &&
+        (!processingOptions.keyword || mapping.keyword) &&
+        (!processingOptions.category || mapping.category) &&
+        (!processingOptions.coupang || mapping.coupang_category);
 
     return (
         <motion.div
@@ -207,7 +219,51 @@ export const ColumnMappingStep = ({ previewData, onSubmit, onBack, fileName }) =
 
             {/* Column Mapping Selectors */}
             <div className="space-y-4">
-                <p className="text-foreground font-medium">열 선택 <span className="text-red-500 text-sm">(모두 필수)</span></p>
+                {/* Processing Options Toggles */}
+                <div className="bg-card rounded-lg p-4 border border-border shadow-sm space-y-3 mb-6">
+                    <p className="text-foreground font-medium mb-2">처리 옵션 선택</p>
+                    <div className="grid grid-cols-2 gap-4">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={processingOptions.refine_name}
+                                onChange={(e) => setProcessingOptions({ ...processingOptions, refine_name: e.target.checked })}
+                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <span className="text-sm font-medium text-foreground">상품명 가공</span>
+                        </label>
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={processingOptions.keyword}
+                                onChange={(e) => setProcessingOptions({ ...processingOptions, keyword: e.target.checked })}
+                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <span className="text-sm font-medium text-foreground">키워드 추천</span>
+                        </label>
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={processingOptions.category}
+                                onChange={(e) => setProcessingOptions({ ...processingOptions, category: e.target.checked })}
+                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <span className="text-sm font-medium text-foreground">네이버 카테고리</span>
+                        </label>
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={processingOptions.coupang}
+                                onChange={(e) => setProcessingOptions({ ...processingOptions, coupang: e.target.checked })}
+                                className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-foreground">쿠팡 카테고리 (신규)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <p className="text-foreground font-medium">열 선택</p>
+
 
                 {/* Original Product Name Column */}
                 <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
@@ -237,85 +293,120 @@ export const ColumnMappingStep = ({ previewData, onSubmit, onBack, fileName }) =
                 </div>
 
                 {/* Refined Product Name Column */}
-                <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                        가공된 상품명 열 <span className="text-red-500">*</span>
-                    </label>
-                    <p className="text-xs text-muted-foreground/80 mb-2">AI로 가공된 상품명을 저장할 열 (기존 데이터가 있어도 덮어씁니다)</p>
-                    <div className="relative">
-                        <select
-                            value={mapping.refined_product_name}
-                            onChange={(e) => handleColumnSelect('refined_product_name', e.target.value)}
-                            className={cn(
-                                "w-full bg-background border rounded-lg px-4 py-3 text-foreground appearance-none cursor-pointer",
-                                "focus:outline-none focus:ring-2 focus:ring-primary",
-                                mapping.refined_product_name ? "border-primary" : "border-input"
-                            )}
-                        >
-                            <option value="" className="bg-background text-muted-foreground">선택하세요</option>
-                            {previewData.columns.map((col, idx) => (
-                                <option key={col} value={col} className="bg-background text-foreground">
-                                    {col}열 - {previewData.headers[idx] || '(제목 없음)'}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                {processingOptions.refine_name && (
+                    <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                            가공된 상품명 열 <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-xs text-muted-foreground/80 mb-2">AI로 가공된 상품명을 저장할 열 (기존 데이터가 있어도 덮어씁니다)</p>
+                        <div className="relative">
+                            <select
+                                value={mapping.refined_product_name}
+                                onChange={(e) => handleColumnSelect('refined_product_name', e.target.value)}
+                                className={cn(
+                                    "w-full bg-background border rounded-lg px-4 py-3 text-foreground appearance-none cursor-pointer",
+                                    "focus:outline-none focus:ring-2 focus:ring-primary",
+                                    mapping.refined_product_name ? "border-primary" : "border-input"
+                                )}
+                            >
+                                <option value="" className="bg-background text-muted-foreground">선택하세요</option>
+                                {previewData.columns.map((col, idx) => (
+                                    <option key={col} value={col} className="bg-background text-foreground">
+                                        {col}열 - {previewData.headers[idx] || '(제목 없음)'}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Keyword Column */}
-                <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                        키워드 열 <span className="text-red-500">*</span>
-                    </label>
-                    <p className="text-xs text-muted-foreground/80 mb-2">추천 키워드를 저장할 열</p>
-                    <div className="relative">
-                        <select
-                            value={mapping.keyword}
-                            onChange={(e) => handleColumnSelect('keyword', e.target.value)}
-                            className={cn(
-                                "w-full bg-background border rounded-lg px-4 py-3 text-foreground appearance-none cursor-pointer",
-                                "focus:outline-none focus:ring-2 focus:ring-primary",
-                                mapping.keyword ? "border-primary" : "border-input"
-                            )}
-                        >
-                            <option value="" className="bg-background text-muted-foreground">선택하세요</option>
-                            {previewData.columns.map((col, idx) => (
-                                <option key={col} value={col} className="bg-background text-foreground">
-                                    {col}열 - {previewData.headers[idx] || '(제목 없음)'}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                {processingOptions.keyword && (
+                    <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                            키워드 열 <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-xs text-muted-foreground/80 mb-2">추천 키워드를 저장할 열</p>
+                        <div className="relative">
+                            <select
+                                value={mapping.keyword}
+                                onChange={(e) => handleColumnSelect('keyword', e.target.value)}
+                                className={cn(
+                                    "w-full bg-background border rounded-lg px-4 py-3 text-foreground appearance-none cursor-pointer",
+                                    "focus:outline-none focus:ring-2 focus:ring-primary",
+                                    mapping.keyword ? "border-primary" : "border-input"
+                                )}
+                            >
+                                <option value="" className="bg-background text-muted-foreground">선택하세요</option>
+                                {previewData.columns.map((col, idx) => (
+                                    <option key={col} value={col} className="bg-background text-foreground">
+                                        {col}열 - {previewData.headers[idx] || '(제목 없음)'}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Category Column */}
-                <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                        카테고리 열 <span className="text-red-500">*</span>
-                    </label>
-                    <p className="text-xs text-muted-foreground/80 mb-2">카테고리 코드를 저장할 열</p>
-                    <div className="relative">
-                        <select
-                            value={mapping.category}
-                            onChange={(e) => handleColumnSelect('category', e.target.value)}
-                            className={cn(
-                                "w-full bg-background border rounded-lg px-4 py-3 text-foreground appearance-none cursor-pointer",
-                                "focus:outline-none focus:ring-2 focus:ring-primary",
-                                mapping.category ? "border-primary" : "border-input"
-                            )}
-                        >
-                            <option value="" className="bg-background text-muted-foreground">선택하세요</option>
-                            {previewData.columns.map((col, idx) => (
-                                <option key={col} value={col} className="bg-background text-foreground">
-                                    {col}열 - {previewData.headers[idx] || '(제목 없음)'}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                {processingOptions.category && (
+                    <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                            네이버 카테고리 열 <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-xs text-muted-foreground/80 mb-2">카테고리 코드를 저장할 열</p>
+                        <div className="relative">
+                            <select
+                                value={mapping.category}
+                                onChange={(e) => handleColumnSelect('category', e.target.value)}
+                                className={cn(
+                                    "w-full bg-background border rounded-lg px-4 py-3 text-foreground appearance-none cursor-pointer",
+                                    "focus:outline-none focus:ring-2 focus:ring-primary",
+                                    mapping.category ? "border-primary" : "border-input"
+                                )}
+                            >
+                                <option value="" className="bg-background text-muted-foreground">선택하세요</option>
+                                {previewData.columns.map((col, idx) => (
+                                    <option key={col} value={col} className="bg-background text-foreground">
+                                        {col}열 - {previewData.headers[idx] || '(제목 없음)'}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                        </div>
                     </div>
-                </div>
+                )}
+
+                {/* Coupang Category Column */}
+                {processingOptions.coupang && (
+                    <div className="bg-card rounded-lg p-4 border border-border shadow-sm">
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                            쿠팡 카테고리 열 <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-xs text-muted-foreground/80 mb-2">쿠팡 카테고리 코드를 저장할 열</p>
+                        <div className="relative">
+                            <select
+                                value={mapping.coupang_category}
+                                onChange={(e) => handleColumnSelect('coupang_category', e.target.value)}
+                                className={cn(
+                                    "w-full bg-background border rounded-lg px-4 py-3 text-foreground appearance-none cursor-pointer",
+                                    "focus:outline-none focus:ring-2 focus:ring-primary",
+                                    mapping.coupang_category ? "border-primary" : "border-input"
+                                )}
+                            >
+                                <option value="" className="bg-background text-muted-foreground">선택하세요</option>
+                                {previewData.columns.map((col, idx) => (
+                                    <option key={col} value={col} className="bg-background text-foreground">
+                                        {col}열 - {previewData.headers[idx] || '(제목 없음)'}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Advanced Settings */}

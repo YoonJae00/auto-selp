@@ -3,6 +3,7 @@ from src.excel_handler import ExcelHandler
 from src.product_name_processor import ProductNameProcessor
 from src.keyword_processor import KeywordProcessor
 from src.category_processor import CategoryProcessor
+from src.coupang_category_processor import CoupangCategoryProcessor
 from src.llm_provider import get_llm_provider
 from src.user_settings_utils import get_user_api_key
 import os
@@ -11,7 +12,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, kw_prompt, cat_processor, llm_provider):
+def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, kw_prompt, cat_processor, coupang_processor, llm_provider, processing_options=None):
     """
     Process a single chunk of data and update progress in the database.
     
@@ -49,6 +50,9 @@ def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, k
             }
         }).eq("id", job_id).execute()
     
+    if processing_options is None:
+        processing_options = {"refine_name": True, "keyword": True, "category": True, "coupang": False}
+
     for index, item in enumerate(data_chunk):
         # Check if job has been cancelled
         job_status_check = db.table("jobs").select("status").eq("id", job_id).execute()
@@ -59,27 +63,49 @@ def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, k
         p_name = item.get('product_name', '')
         current_row = item['row_index']
         
-        # Skip empty rows
+        # Skip empty rows if we are refining product name, otherwise we might still process if p_name is present
         if not p_name.strip():
             continue
         
         # Process product name
-        refined_name = pn_processor.refine_product_name(p_name, prompt_template=pn_prompt)
+        refined_name = p_name
+        if processing_options.get("refine_name", True):
+            refined_name = pn_processor.refine_product_name(p_name, prompt_template=pn_prompt)
         
         # Process keywords
-        keywords = kw_processor.process_keywords(refined_name, prompt_template=kw_prompt)
+        keywords = ""
+        if processing_options.get("keyword", True):
+            keywords = kw_processor.process_keywords(refined_name, prompt_template=kw_prompt)
         
-        # Process category
-        category_code = cat_processor.get_category_code(refined_name)
+        # Process category (Naver)
+        category_code = ""
+        if processing_options.get("category", True):
+            category_code = cat_processor.get_category_code(refined_name)
+
+        # Process Coupang Category
+        coupang_category_code = ""
+        if processing_options.get("coupang", False) and coupang_processor:
+            coupang_category_code = coupang_processor.get_category_code(refined_name)
         
         # Store result
-        results.append({
+        result_item = {
             'row_index': item['row_index'],
-            'refined_name': refined_name,
-            'keywords': keywords,
-            'category_code': category_code,
             'image_url': ''
-        })
+        }
+        
+        if processing_options.get("refine_name", True):
+             result_item['refined_name'] = refined_name
+             
+        if processing_options.get("keyword", True):
+             result_item['keywords'] = keywords
+             
+        if processing_options.get("category", True):
+             result_item['category_code'] = category_code
+
+        if processing_options.get("coupang", False):
+             result_item['coupang_category_code'] = coupang_category_code
+             
+        results.append(result_item)
         
         # Update chunk progress every 5 rows or at the end
         if (index + 1) % 5 == 0 or index == total_in_chunk - 1:
@@ -144,22 +170,34 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
         # 3. Extract configuration from metadata
         meta_data = existing_meta_data
         column_mapping = meta_data.get("column_mapping", {})
+        processing_options = meta_data.get("processing_options", {
+            "refine_name": True,
+            "keyword": True,
+            "category": True,
+            "category": True,
+            "coupang": False
+        })
         parallel_count = meta_data.get("parallel_count", 1)
-        
+
         # Extract column info
         original_product_col = column_mapping.get("original_product_name")
         refined_product_col = column_mapping.get("refined_product_name")
         keyword_col = column_mapping.get("keyword")
         category_col = column_mapping.get("category")
+        coupang_col = column_mapping.get("coupang_category")
         
         if not original_product_col:
             raise ValueError("Original product name column is required in column_mapping")
-        if not refined_product_col:
-            raise ValueError("Refined product name column is required in column_mapping")
-        if not keyword_col:
-            raise ValueError("Keyword column is required in column_mapping")
-        if not category_col:
-            raise ValueError("Category column is required in column_mapping")
+        
+        # Conditional validation
+        if processing_options.get("refine_name", True) and not refined_product_col:
+            raise ValueError("Refined product name column is required when option is enabled")
+        if processing_options.get("keyword", True) and not keyword_col:
+            raise ValueError("Keyword column is required when option is enabled")
+        if processing_options.get("category", True) and not category_col:
+            raise ValueError("Category column is required when option is enabled")
+        if processing_options.get("coupang", False) and not coupang_col:
+            raise ValueError("Coupang Category column is required when option is enabled")
         
         # 4. Fetch User's Active Prompts
         pn_res = db.table("prompts").select("content").eq("user_id", user_id).eq("type", "product_name").eq("is_active", True).execute()
@@ -196,6 +234,11 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
         # 6. Initialize Processors
         excel_handler = ExcelHandler()
         cat_processor = CategoryProcessor(mapping_file_path="naver_category_mapping.xls")
+        
+        # Initialize Coupang Processor
+        coupang_access_key = get_user_api_key(db, user_id, "coupang_access_key")
+        coupang_secret_key = get_user_api_key(db, user_id, "coupang_secret_key")
+        coupang_processor = CoupangCategoryProcessor(coupang_access_key, coupang_secret_key)
         
         # 6. Load Data
         data_list = excel_handler.load_excel(
@@ -238,7 +281,9 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
                         pn_prompt,
                         kw_prompt,
                         cat_processor,
-                        llm_provider
+                        coupang_processor,
+                        llm_provider,
+                        processing_options
                     )
                     futures.append((chunk_id, future))
             

@@ -107,16 +107,32 @@ class ExcelHandler:
         ws = wb.active
         
         # 열 문자를 인덱스로 변환
-        refined_name_col_idx = column_index_from_string(column_mapping.get('refined_product_name', 'B'))
-        keyword_col_idx = column_index_from_string(column_mapping.get('keyword', 'E'))
-        category_col_idx = column_index_from_string(column_mapping.get('category', 'F'))
+        # 열 문자를 인덱스로 변환
+        refined_name_col = column_mapping.get('refined_product_name')
+        keyword_col = column_mapping.get('keyword')
+        category_col = column_mapping.get('category')
+        coupang_category_col = column_mapping.get('coupang_category')
+
+        refined_name_col_idx = column_index_from_string(refined_name_col) if refined_name_col else None
+        keyword_col_idx = column_index_from_string(keyword_col) if keyword_col else None
+        category_col_idx = column_index_from_string(category_col) if category_col else None
+        coupang_category_col_idx = column_index_from_string(coupang_category_col) if coupang_category_col else None
         
         # 데이터 쓰기 (헤더는 이미 있다고 가정, 또는 보존)
         for item in results:
             row_idx = item['row_index']
-            ws.cell(row=row_idx, column=refined_name_col_idx, value=item.get('refined_name', ''))
-            ws.cell(row=row_idx, column=keyword_col_idx, value=item.get('keywords', ''))
-            ws.cell(row=row_idx, column=category_col_idx, value=item.get('category_code', ''))
+            
+            if 'refined_name' in item and refined_name_col_idx:
+                ws.cell(row=row_idx, column=refined_name_col_idx, value=item['refined_name'])
+            
+            if 'keywords' in item and keyword_col_idx:
+                ws.cell(row=row_idx, column=keyword_col_idx, value=item['keywords'])
+                
+            if 'category_code' in item and category_col_idx:
+                ws.cell(row=row_idx, column=category_col_idx, value=item['category_code'])
+
+            if 'coupang_category_code' in item and coupang_category_col_idx:
+                ws.cell(row=row_idx, column=coupang_category_col_idx, value=item['coupang_category_code'])
             
         # 저장 (파일명 변경하여 원본 보존)
         new_path = file_path.replace(".xlsx", "_processed.xlsx")

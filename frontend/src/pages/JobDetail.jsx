@@ -15,7 +15,8 @@ import { useState } from 'react';
 const stepLabels = {
     product_name: '상품명 가공',
     keyword: '키워드 생성',
-    category: '카테고리 분류'
+    category: '카테고리 분류',
+    coupang: '쿠팡 카테고리'
 };
 
 const statusConfig = {
@@ -384,6 +385,12 @@ const JobDetail = () => {
                                 <p className="text-xs text-muted-foreground mb-1">카테고리</p>
                                 <p className="text-foreground font-medium">{metaData.column_mapping.category}열</p>
                             </div>
+                            {metaData.column_mapping.coupang_category && (
+                                <div className="bg-muted/30 rounded-lg p-3 border border-border">
+                                    <p className="text-xs text-muted-foreground mb-1">쿠팡 카테고리</p>
+                                    <p className="text-foreground font-medium">{metaData.column_mapping.coupang_category}열</p>
+                                </div>
+                            )}
                         </div>
                     </Card>
                 )}

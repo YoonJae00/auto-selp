@@ -60,6 +60,7 @@ def create_job(
     file: UploadFile = File(...),
     column_mapping: str = Form(...),  # JSON string
     parallel_count: int = Form(1),  # Number of parallel workers (1-10)
+    processing_options: str = Form(None), # JSON string, optional
     user = Depends(get_current_user)
 ):
     """
@@ -68,13 +69,8 @@ def create_job(
     Args:
         file: 엑셀 파일
         column_mapping: JSON 문자열 형식의 열 매핑 정보
-            예: {
-                "original_product_name": "A", 
-                "refined_product_name": "B",
-                "keyword": "E", 
-                "category": "F"
-            }
         parallel_count: 병렬 처리 작업 수 (1-10, 기본값: 1)
+        processing_options: 처리 옵션 (JSON 문자열)
     """
     # Validate parallel_count
     if parallel_count < 1 or parallel_count > 10:
@@ -93,12 +89,36 @@ def create_job(
         mapping = json.loads(column_mapping)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid column_mapping JSON format")
+        
+    # Parse processing_options
+    options = {}
+    if processing_options:
+        try:
+            options = json.loads(processing_options)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid processing_options JSON format")
     
-    # Validate required fields
-    required_fields = ["original_product_name", "refined_product_name", "keyword", "category"]
-    for field in required_fields:
-        if field not in mapping or not mapping[field]:
-            raise HTTPException(status_code=400, detail=f"{field} column is required")
+    # Validate required fields based on options
+    # Default options if not provided
+    if not options:
+        options = {
+            "refine_name": True,
+            "keyword": True,
+            "category": True,
+            "coupang": False 
+        }
+
+    if options.get("refine_name", True) and not mapping.get("refined_product_name"):
+        raise HTTPException(status_code=400, detail="Refined product name column is required")
+    if options.get("keyword", True) and not mapping.get("keyword"):
+        raise HTTPException(status_code=400, detail="Keyword column is required")
+    if options.get("category", True) and not mapping.get("category"):
+        raise HTTPException(status_code=400, detail="Category column is required")
+    if options.get("coupang", False) and not mapping.get("coupang_category"):
+        raise HTTPException(status_code=400, detail="Coupang Category column is required")
+    
+    if not mapping.get("original_product_name"):
+        raise HTTPException(status_code=400, detail="Original product name column is required")
 
     # 3. Initialize chunks metadata
     chunks = [
@@ -123,6 +143,7 @@ def create_job(
             "original_filename": file.filename,
             "column_mapping": mapping,
             "parallel_count": parallel_count,
+            "processing_options": options,
             "chunks": chunks
         }
     }
