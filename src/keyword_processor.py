@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 from src.llm_provider import BaseLLMProvider, get_llm_provider
 from src.trademark_blacklist import contains_trademark, filter_trademarked_keywords
 
+from src.keyword_stop_words import KEYWORD_STOP_WORDS
+
 load_dotenv()
 
 class KeywordProcessor:
@@ -19,7 +21,7 @@ class KeywordProcessor:
     
     3-Phase 워크플로우:
         Phase 1: 다각도 시드(Seed) 수집 - 상품명 변형 + 다회 검색
-        Phase 2: 경쟁도 기반 필터링 - 네이버 API 데이터 활용
+        Phase 2: 경쟁도 기반 필터링 - 네이버 API 데이터 활용 + 불용어(Stop Words) 제거
         Phase 3: 상표권 이중 검증 + LLM 최종 큐레이션
     """
     
@@ -252,6 +254,7 @@ class KeywordProcessor:
         경쟁도와 검색량 데이터를 기반으로 소상공인에 적합한 키워드를 필터링합니다.
         
         필터링 기준:
+        - 불용어(Stop Words) 포함 키워드 제거
         - 경쟁도 "높음" 키워드 제거 (대기업 독점 영역)
         - 단일 단어 키워드 제거 (너무 광범위)
         - 롱테일 키워드(2단어 이상) 우선
@@ -264,6 +267,11 @@ class KeywordProcessor:
             comp_idx = item.get("compIdx", "불명")
             total_qc = item.get("totalQcCnt", 0)
             
+            # 0. 불용어(Stop Words) 필터링
+            if self._is_stop_word(kw):
+                 removed_reasons.append(f"   🚫 '{kw}' → 불용어 포함")
+                 continue
+
             # 1. 경쟁도 "높음" 제거
             if comp_idx == "높음":
                 removed_reasons.append(f"   🚫 '{kw}' → 경쟁도 높음")
@@ -355,10 +363,13 @@ class KeywordProcessor:
             
             prompt_v1 = f"""Select 10 safe keywords from this list for '{product_name}'.
 List: {all_keyword_names}
+Constraint:
+- No generic terms like 'Option', 'Random', 'Unit' (e.g. 1개, 1Set), 'Shipping' terms.
+- No trademarks/brands.
 Return comma-separated string."""
 
             prompt_v2 = f"""Extract 10 keywords for '{product_name}' from: {all_keyword_names}.
-Safety: No brands.
+Safety: No brands. No generic options (color/size/unit).
 Format: Comma separated."""
 
             prompts = [prompt_v1, prompt_v2, prompt_v1] # Retry sequence
@@ -380,7 +391,7 @@ Format: Comma separated."""
                     normalized = result.replace('\n', ',')
                     candidates = [k.strip() for k in normalized.split(',') if k.strip()]
                     
-                    # Filter trademarks
+                    # Filter trademarks and stop words
                     temp_final = []
                     for kw in candidates:
                         # Basic cleanup
@@ -390,6 +401,9 @@ Format: Comma separated."""
                         if contains_trademark(kw):
                             # print(f"   ⚠️ Removed Brand: {kw}")
                             pass
+                        elif self._is_stop_word(kw):
+                             # print(f"   ⚠️ Removed Stop Word: {kw}")
+                             pass
                         else:
                             temp_final.append(kw)
                     
@@ -405,7 +419,7 @@ Format: Comma separated."""
             if not final:
                 print("   ⚠️ LLM Failed all attempts. Using Top 10 by logic.")
                 # Simple logic fallback
-                final = [item["keyword"] for item in keywords_data[:10] if not contains_trademark(item["keyword"])]
+                final = [item["keyword"] for item in keywords_data[:10] if not contains_trademark(item["keyword"]) and not self._is_stop_word(item["keyword"])]
             
             print(f"   [LLM] 최종 선별 ({len(final)}개): {final}")
             return final
@@ -414,6 +428,47 @@ Format: Comma separated."""
             print(f"   ⚠️ LLM 큐레이션 중 오류: {e}")
             # Fallback: 상표 안전 키워드에서 상위 10개 반환
             return [item["keyword"] for item in keywords_data[:10]]
+
+    def _is_stop_word(self, keyword: str) -> bool:
+        """
+        키워드가 불용어(Stop Words)인지 확인합니다.
+        
+        Args:
+            keyword: 검사할 키워드
+            
+        Returns:
+            True if stop word, False otherwise
+        """
+        kw = keyword.strip()
+        kw_nospace = kw.replace(" ", "")
+        
+        # 1. Check exact match
+        if kw in KEYWORD_STOP_WORDS:
+            return True
+        if kw_nospace in KEYWORD_STOP_WORDS:
+            return True
+            
+        # 2. Check suffix match for specific categories (e.g., ends with "배송")
+        #  (단, "로켓배송" 같은건 리스트에 있지만, "빠른배송" 같은 변종 처리를 위함)
+        if kw.endswith("배송") or kw.endswith("발송"):
+            return True
+            
+        # 3. Check for specific substring patterns (careful not to over-filter)
+        # "1개", "2세트" 등 수량/단위 패턴 체크
+        # '개' '세트' 등으로 끝나는 짧은 단어 (숫자+단위 조합)
+        if re.match(r'^\d+(개|세트|묶음|박스|팩|통|병|매|장|롤|켤레|족|pcs|ea|set)$', kw_nospace, re.IGNORECASE):
+            return True
+            
+        # 4. Check if keyword *contains* stop words that should never appear (Specific Garbage)
+        # e.g., "하트", "랜덤"
+        for stop in KEYWORD_STOP_WORDS:
+            # "배송" 같은건 포함되어도 "배송비" 처럼 덜 위험할 수 있지만, 
+            # "랜덤", "옵션" 등은 포함되면 거의 100% 쓰레기
+            if stop in ["랜덤", "랜덤발송", "옵션", "선택", "하트", "별", "쪽", "기본"]:
+                 if stop in kw:
+                     return True
+                     
+        return False
 
     # ============================================================
     # 유틸리티
