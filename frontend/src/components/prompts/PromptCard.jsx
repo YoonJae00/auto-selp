@@ -35,13 +35,13 @@ export const PromptCard = ({ prompt, onEdit, onToggleActive, onDelete }) => {
                         <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 mb-2">
                             {TYPE_LABELS[prompt.type] || prompt.type}
                         </span>
-                        <h3 className="text-xl font-bold text-white">{prompt.title}</h3>
+                        <h3 className="text-xl font-bold text-foreground">{prompt.title}</h3>
                     </div>
                     <button
                         onClick={() => onToggleActive(prompt)}
                         className={`p-2 rounded-full transition-colors ${prompt.is_active
-                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                            : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+                            ? 'bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
                             }`}
                         title={prompt.is_active ? "활성" : "비활성 (클릭하여 활성화)"}
                     >
@@ -55,7 +55,7 @@ export const PromptCard = ({ prompt, onEdit, onToggleActive, onDelete }) => {
                         {variables.map((v) => (
                             <span
                                 key={v}
-                                className="inline-block px-2 py-0.5 rounded-md text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
+                                className="inline-block px-2 py-0.5 rounded-md text-[10px] font-mono bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20"
                             >
                                 {v}
                             </span>
@@ -63,11 +63,11 @@ export const PromptCard = ({ prompt, onEdit, onToggleActive, onDelete }) => {
                     </div>
                 )}
 
-                <div className="flex-1 bg-black/20 rounded-xl p-3 mb-4 overflow-hidden relative group">
-                    <p className="text-gray-400 text-sm line-clamp-4 font-mono whitespace-pre-wrap">
+                <div className="flex-1 bg-accent/50 dark:bg-black/20 rounded-xl p-3 mb-4 overflow-hidden relative group">
+                    <p className="text-muted-foreground text-sm line-clamp-4 font-mono whitespace-pre-wrap">
                         {prompt.content}
                     </p>
-                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 to-transparent opacity-50 group-hover:opacity-30 transition-opacity" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent opacity-90 dark:opacity-50 group-hover:opacity-30 transition-opacity" />
                 </div>
                 <div className="flex items-center">
                     <Button

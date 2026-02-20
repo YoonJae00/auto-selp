@@ -48,8 +48,8 @@ export const LLMProviderSettings = ({ preferences, onChange, onSave, isSaving })
                 <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
                     <div>
-                        <h3 className="text-sm font-semibold text-blue-300 mb-1">LLM 제공자 선택</h3>
-                        <p className="text-sm text-gray-400">
+                        <h3 className="text-sm font-semibold text-blue-600 dark:text-blue-300 mb-1">LLM 제공자 선택</h3>
+                        <p className="text-sm text-blue-700/80 dark:text-blue-400/80">
                             상품명 가공 및 키워드 발굴에 사용할 AI 모델을 선택하세요.
                             선택한 제공자의 API 키가 설정되어 있어야 합니다.
                         </p>
@@ -66,7 +66,7 @@ export const LLMProviderSettings = ({ preferences, onChange, onSave, isSaving })
                             relative p-4 rounded-xl border-2 transition-all cursor-pointer
                             ${currentProvider === provider.id
                                 ? 'border-primary bg-primary/5'
-                                : 'border-white/10 bg-gray-900/30 hover:border-white/20'
+                                : 'border-border bg-card hover:border-border/80 hover:bg-accent/50'
                             }
                         `}
                     >
@@ -75,17 +75,17 @@ export const LLMProviderSettings = ({ preferences, onChange, onSave, isSaving })
                                 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0
                                 ${currentProvider === provider.id
                                     ? 'border-primary bg-primary'
-                                    : 'border-white/30'
+                                    : 'border-input'
                                 }
                             `}>
                                 {currentProvider === provider.id && (
-                                    <div className="w-2.5 h-2.5 bg-white rounded-full" />
+                                    <div className="w-2.5 h-2.5 bg-background rounded-full" />
                                 )}
                             </div>
 
                             <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                    <h3 className="text-base font-semibold text-white">
+                                    <h3 className="text-base font-semibold text-foreground">
                                         {provider.name}
                                     </h3>
                                     {currentProvider === provider.id && (
@@ -94,10 +94,10 @@ export const LLMProviderSettings = ({ preferences, onChange, onSave, isSaving })
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-sm text-gray-400 mt-1">
+                                <p className="text-sm text-muted-foreground mt-1">
                                     {provider.description}
                                 </p>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-muted-foreground mt-1">
                                     모델: {provider.model}
                                 </p>
                             </div>
@@ -106,12 +106,12 @@ export const LLMProviderSettings = ({ preferences, onChange, onSave, isSaving })
                 ))}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                 {hasChanges && (
                     <motion.div
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="text-sm text-amber-400 flex items-center gap-2"
+                        className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2"
                     >
                         <AlertCircle className="w-4 h-4" />
                         저장되지 않은 변경사항이 있습니다

@@ -134,7 +134,7 @@ export const EditPromptModal = ({ isOpen, onClose, prompt }) => {
                 {/* 타입 선택 (새 프롬프트 생성 시만) */}
                 {isNew && (
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-300 ml-1">프롬프트 타입</label>
+                        <label className="text-sm font-medium text-muted-foreground ml-1">프롬프트 타입</label>
                         <div className="flex gap-3">
                             {Object.entries(TYPE_LABELS).map(([key, label]) => (
                                 <button
@@ -142,8 +142,8 @@ export const EditPromptModal = ({ isOpen, onClose, prompt }) => {
                                     type="button"
                                     onClick={() => setType(key)}
                                     className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all border ${type === key
-                                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
-                                        : 'bg-gray-800/50 border-white/10 text-gray-400 hover:bg-gray-800 hover:text-gray-300'
+                                        ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-600 dark:text-indigo-300'
+                                        : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:text-foreground'
                                         }`}
                                 >
                                     {label}
@@ -156,8 +156,8 @@ export const EditPromptModal = ({ isOpen, onClose, prompt }) => {
                 {/* 타입 표시 (편집 시) */}
                 {!isNew && (
                     <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">타입:</span>
-                        <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-600/20 text-indigo-300 border border-indigo-500/30">
+                        <span className="text-xs text-muted-foreground">타입:</span>
+                        <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20">
                             {TYPE_LABELS[prompt?.type] || prompt?.type}
                         </span>
                     </div>
@@ -174,13 +174,13 @@ export const EditPromptModal = ({ isOpen, onClose, prompt }) => {
                 {/* 프롬프트 내용 */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-gray-300 ml-1">프롬프트 내용</label>
+                        <label className="text-sm font-medium text-muted-foreground ml-1">프롬프트 내용</label>
                         {/* 기본값 초기화 버튼 (기존 프롬프트 편집 시) */}
                         {!isNew && (
                             <button
                                 type="button"
                                 onClick={handleReset}
-                                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-amber-400 transition-colors"
+                                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
                                 title="기본 템플릿으로 초기화"
                             >
                                 <RotateCcw className="w-3 h-3" />
@@ -191,7 +191,7 @@ export const EditPromptModal = ({ isOpen, onClose, prompt }) => {
 
                     <textarea
                         ref={textareaRef}
-                        className="w-full h-64 bg-gray-950/50 border border-white/10 text-white rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-500 backdrop-blur-sm transition-all resize-y leading-relaxed"
+                        className="w-full h-64 bg-background border border-input text-foreground rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground backdrop-blur-sm transition-all resize-y leading-relaxed"
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                         placeholder="프롬프트 템플릿을 입력하세요..."
@@ -200,7 +200,7 @@ export const EditPromptModal = ({ isOpen, onClose, prompt }) => {
 
                     {/* 필수 변수 태그 + 삽입 버튼 */}
                     <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <span className="text-xs text-gray-500">필수 변수:</span>
+                        <span className="text-xs text-muted-foreground">필수 변수:</span>
                         {requiredVars.map((v) => {
                             const isPresent = content.includes(v);
                             return (
@@ -209,8 +209,8 @@ export const EditPromptModal = ({ isOpen, onClose, prompt }) => {
                                     type="button"
                                     onClick={() => insertVariable(v)}
                                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono transition-all border ${isPresent
-                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                        : 'bg-red-500/10 border-red-500/30 text-red-400 animate-pulse'
+                                        ? 'bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400'
+                                        : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400 animate-pulse'
                                         }`}
                                     title={isPresent ? '포함됨 (클릭하면 커서 위치에 삽입)' : '누락됨! 클릭하여 삽입'}
                                 >
@@ -224,13 +224,13 @@ export const EditPromptModal = ({ isOpen, onClose, prompt }) => {
                     {/* 검증 경고 메시지 */}
                     {hasValidationError && content.length > 0 && (
                         <div className="flex items-start gap-2 mt-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                            <div className="text-xs text-red-300">
+                            <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+                            <div className="text-xs text-red-600 dark:text-red-300">
                                 <p className="font-medium">필수 변수가 누락되었습니다:</p>
                                 <p className="mt-1 font-mono">
                                     {missingVariables.join(', ')}
                                 </p>
-                                <p className="mt-1 text-red-400/70">
+                                <p className="mt-1 text-red-600/70 dark:text-red-400/70">
                                     위 변수 버튼을 클릭하면 커서 위치에 삽입됩니다.
                                 </p>
                             </div>
@@ -239,7 +239,7 @@ export const EditPromptModal = ({ isOpen, onClose, prompt }) => {
                 </div>
 
                 {/* 액션 버튼 */}
-                <div className="flex justify-end gap-3 mt-6 pt-2 border-t border-white/5">
+                <div className="flex justify-end gap-3 mt-6 pt-2 border-t border-border">
                     <Button type="button" variant="ghost" onClick={onClose}>
                         취소
                     </Button>
