@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Prompts from './pages/Prompts';
 import JobDetail from './pages/JobDetail';
 import Settings from './pages/Settings';
+import ExcelProcessor from './pages/ExcelProcessor';
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ function App() {
                                 <ProtectedRoute>
                                     <Routes>
                                         <Route path="/" element={<Dashboard />} />
+                                        <Route path="/excel" element={<ExcelProcessor />} />
                                         <Route path="/prompts" element={<Prompts />} />
                                         <Route path="/settings" element={<Settings />} />
                                         <Route path="/job/:jobId" element={<JobDetail />} />

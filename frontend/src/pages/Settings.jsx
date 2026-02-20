@@ -84,7 +84,7 @@ const Settings = () => {
                     <div className="space-y-6">
                         <div className="flex gap-2 mb-6">
                             {TABS.map((tab) => (
-                                <div key={tab.key} className="h-16 bg-gray-800 rounded animate-pulse w-32" />
+                                <div key={tab.key} className="h-16 bg-muted rounded animate-pulse w-32" />
                             ))}
                         </div>
                         <LoadingSkeleton count={2} />

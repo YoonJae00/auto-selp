@@ -11,10 +11,10 @@ export const Button = ({
     ...props
 }) => {
     const variants = {
-        primary: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/30 border border-indigo-500/50',
-        secondary: 'bg-white/10 hover:bg-white/20 text-white border border-white/10 backdrop-blur-md',
-        ghost: 'hover:bg-white/5 text-gray-300 hover:text-white',
-        destructive: 'bg-red-500/80 hover:bg-red-600 text-white shadow-lg shadow-red-500/20',
+        primary: 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30',
+        secondary: 'bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border backdrop-blur-md',
+        ghost: 'hover:bg-accent text-muted-foreground hover:text-accent-foreground',
+        destructive: 'bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-lg shadow-destructive/20',
     };
 
     const sizes = {
@@ -28,7 +28,7 @@ export const Button = ({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className={cn(
-                'relative inline-flex items-center justify-center rounded-xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:pointer-events-none disabled:opacity-50',
+                'relative inline-flex items-center justify-center rounded-xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
                 variants[variant],
                 sizes[size],
                 className

@@ -171,8 +171,8 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
                 <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
                     <div>
-                        <h3 className="text-sm font-semibold text-amber-300 mb-1">보안 안내</h3>
-                        <p className="text-sm text-gray-400">
+                        <h3 className="text-sm font-semibold text-amber-500 dark:text-amber-300 mb-1">보안 안내</h3>
+                        <p className="text-sm text-amber-600/80 dark:text-amber-400/80">
                             API 키는 암호화되어 안전하게 저장됩니다. 입력한 키는 마스킹(••••••••)으로 표시됩니다.
                         </p>
                     </div>
@@ -180,11 +180,11 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
             </div>
 
             {apiSections.map((section) => (
-                <div key={section.apiType} className="bg-gray-900/30 border border-white/5 rounded-xl p-6 space-y-4">
+                <div key={section.apiType} className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-sm">
                     <div className="flex items-start justify-between">
                         <div>
-                            <h3 className="text-lg font-semibold text-white">{section.title}</h3>
-                            <p className="text-sm text-gray-400 mt-1">{section.description}</p>
+                            <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
+                            <p className="text-sm text-muted-foreground mt-1">{section.description}</p>
                         </div>
 
                         {testResults[section.apiType] && (
@@ -210,7 +210,7 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
                     <div className="space-y-3">
                         {section.fields.map((field) => (
                             <div key={field.key} className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-300">
+                                <label className="block text-sm font-medium text-foreground">
                                     {field.label}
                                 </label>
                                 {field.type === 'password' ? (
@@ -250,12 +250,12 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
                 </div>
             ))}
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                 {hasChanges && (
                     <motion.div
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="text-sm text-amber-400 flex items-center gap-2"
+                        className="text-sm text-amber-500 dark:text-amber-400 flex items-center gap-2"
                     >
                         <AlertCircle className="w-4 h-4" />
                         저장되지 않은 변경사항이 있습니다
