@@ -1,38 +1,36 @@
-import { useState } from 'react';
-import { UploadZone } from '../components/dashboard/UploadZone';
-import { JobStatus } from '../components/dashboard/JobStatus';
-import { HistoryTable } from '../components/dashboard/HistoryTable';
+import { StatCards } from '../components/dashboard/StatCards';
+import { SalesChart } from '../components/dashboard/SalesChart';
+import { QuickActions } from '../components/dashboard/QuickActions';
 import { Layout } from '../components/layout/Layout';
 import { motion } from 'framer-motion';
 
 const Dashboard = () => {
-    const [activeJobId, setActiveJobId] = useState(null);
-
-    const handleUploadSuccess = (data) => {
-        // Backend returns { job_id: "..." }
-        if (data?.job_id) {
-            setActiveJobId(data.job_id);
-        }
-    };
 
     return (
         <Layout>
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-8"
-            >
-                <div>
-                    <h1 className="text-3xl font-bold text-foreground">대시보드</h1>
-                    <p className="text-muted-foreground mt-2">엑셀 파일을 업로드하여 처리를 시작하세요.</p>
+            <div className="space-y-8 pb-12">
+                {/* Welcome & Stats */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                >
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-500 w-fit pb-1">
+                            환영합니다!
+                        </h1>
+                        <p className="text-muted-foreground mt-2 font-medium">
+                            Auto-Selp 대시보드에서 비즈니스 현황을 한눈에 확인하세요.
+                        </p>
+                    </div>
+                    <StatCards />
+                </motion.div>
+
+                {/* Charts & Actions Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <SalesChart />
+                    <QuickActions />
                 </div>
-
-                <UploadZone onUploadSuccess={handleUploadSuccess} />
-
-                {activeJobId && <JobStatus jobId={activeJobId} />}
-
-                <HistoryTable />
-            </motion.div>
+            </div>
         </Layout>
     );
 };

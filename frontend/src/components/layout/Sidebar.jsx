@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 
 const navItems = [
     { icon: LayoutDashboard, label: '대시보드', path: '/' },
+    { icon: FileSpreadsheet, label: '엑셀 가공', path: '/excel' },
 ];
 
 const settingsSubItems = [
@@ -25,7 +26,7 @@ export const Sidebar = () => {
         <motion.aside
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            className="w-64 h-screen bg-card border-r border-border flex flex-col fixed left-0 top-0 z-40 shadow-lg"
+            className="w-64 h-screen bg-card/95 backdrop-blur-xl border-r border-border flex flex-col fixed left-0 top-0 z-40 shadow-[4px_0_24px_rgba(0,0,0,0.02)] dark:shadow-[4px_0_24px_rgba(0,0,0,0.2)]"
         >
             <div className="p-6 flex items-center gap-3 border-b border-border">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
