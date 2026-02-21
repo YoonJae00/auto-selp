@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Settings, LogOut, Wand2, ChevronDown, FileSpreadsheet, Key, Palette } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { supabase } from '../../lib/supabase';
 
 const navItems = [
     { icon: LayoutDashboard, label: '대시보드', path: '/' },
@@ -109,7 +108,10 @@ export const Sidebar = () => {
 
             <div className="p-4 border-t border-border">
                 <button
-                    onClick={() => supabase.auth.signOut()}
+                    onClick={() => {
+                        localStorage.removeItem('access_token');
+                        window.location.href = '/login';
+                    }}
                     className="flex items-center gap-3 px-4 py-3 w-full text-left text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
                 >
                     <LogOut className="w-5 h-5" />

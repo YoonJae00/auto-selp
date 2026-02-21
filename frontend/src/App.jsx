@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { supabase } from './lib/supabase';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -12,24 +11,16 @@ import ExcelProcessor from './pages/ExcelProcessor';
 
 const queryClient = new QueryClient();
 
-// Protected Route Component
 const ProtectedRoute = ({ children }) => {
-    const [session, setSession] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setLoading(false);
-        });
-
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-        });
-
-        return () => subscription.unsubscribe();
+        const token = localStorage.getItem('access_token');
+        if (token) {
+            setIsAuthenticated(true);
+        }
+        setLoading(false);
     }, []);
 
     if (loading) {
@@ -40,7 +31,7 @@ const ProtectedRoute = ({ children }) => {
         );
     }
 
-    if (!session) {
+    if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
     }
 
