@@ -29,7 +29,7 @@ class KeywordProcessor:
         if api_keys is None:
             api_keys = {}
         # Naver Ad API Config (검색광고 API)
-        self.naver_base_url = os.getenv("NAVER_API_BASE_URL", "https://api.naver.com")
+        self.naver_base_url = os.getenv("NAVER_API_BASE_URL", "https://api.searchad.naver.com")
         self.naver_api_key = api_keys.get("naver_api_key") or os.getenv("NAVER_API_KEY")
         self.naver_secret_key = api_keys.get("naver_secret_key") or os.getenv("NAVER_SECRET_KEY")
         self.naver_customer_id = api_keys.get("naver_customer_id") or os.getenv("NAVER_CUSTOMER_ID")
