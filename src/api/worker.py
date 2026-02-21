@@ -13,7 +13,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, kw_prompt, cat_processor, coupang_processor, llm_provider, processing_options=None):
+def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, kw_prompt, cat_processor, coupang_processor, llm_provider, processing_options=None, api_keys=None):
     """
     Process a single chunk of data and update progress in the database.
     
@@ -34,7 +34,7 @@ def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, k
     db = SessionLocal()
     try:
         pn_processor = ProductNameProcessor(llm_provider=llm_provider)
-        kw_processor = KeywordProcessor(llm_provider=llm_provider)
+        kw_processor = KeywordProcessor(llm_provider=llm_provider, api_keys=api_keys)
         
         results = []
         total_in_chunk = len(data_chunk)
@@ -204,6 +204,7 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
         user_settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
         llm_provider_type = "gemini"  # default
         llm_api_key = None
+        api_keys = {}
         
         if user_settings:
             preferences = user_settings.preferences or {}
@@ -226,7 +227,7 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
 
         # 6. Initialize Processors
         excel_handler = ExcelHandler()
-        cat_processor = CategoryProcessor(mapping_file_path="naver_category_mapping.xls")
+        cat_processor = CategoryProcessor(mapping_file_path="naver_category_mapping.xls", api_keys=api_keys)
         
         # Initialize Coupang Processor
         coupang_access_key = get_user_api_key(db, user_id, "coupang_access_key")
@@ -275,7 +276,8 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
                         cat_processor,
                         coupang_processor,
                         llm_provider,
-                        processing_options
+                        processing_options,
+                        api_keys
                     )
                     futures.append((chunk_id, future))
             

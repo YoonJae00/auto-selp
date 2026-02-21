@@ -25,12 +25,14 @@ class KeywordProcessor:
         Phase 3: 상표권 이중 검증 + LLM 최종 큐레이션
     """
     
-    def __init__(self, llm_provider: Optional[BaseLLMProvider] = None):
+    def __init__(self, llm_provider: Optional[BaseLLMProvider] = None, api_keys: dict = None):
+        if api_keys is None:
+            api_keys = {}
         # Naver Ad API Config (검색광고 API)
         self.naver_base_url = os.getenv("NAVER_API_BASE_URL", "https://api.naver.com")
-        self.naver_api_key = os.getenv("NAVER_API_KEY")
-        self.naver_secret_key = os.getenv("NAVER_SECRET_KEY")
-        self.naver_customer_id = os.getenv("NAVER_CUSTOMER_ID")
+        self.naver_api_key = api_keys.get("naver_api_key") or os.getenv("NAVER_API_KEY")
+        self.naver_secret_key = api_keys.get("naver_secret_key") or os.getenv("NAVER_SECRET_KEY")
+        self.naver_customer_id = api_keys.get("naver_customer_id") or os.getenv("NAVER_CUSTOMER_ID")
         
         # LLM Provider
         if llm_provider is None:
