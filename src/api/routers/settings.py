@@ -40,6 +40,8 @@ class ApiKeys(BaseModel):
     naver_customer_id: Optional[str] = None
     naver_client_id: Optional[str] = None
     naver_client_secret: Optional[str] = None
+    coupang_access_key: Optional[str] = None
+    coupang_secret_key: Optional[str] = None
     nano_banana_api_key: Optional[str] = None
 
 class UserSettingsUpdate(BaseModel):
