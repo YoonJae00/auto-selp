@@ -246,7 +246,7 @@ async def test_api_connection(
     
     if api_type == "gemini":
         try:
-            api_key = api_credentials.get("gemini_api_key")
+            api_key = (api_credentials.get("gemini_api_key") or "").strip()
             if not api_key:
                 raise HTTPException(status_code=400, detail="API 키가 필요합니다.")
             
@@ -263,7 +263,7 @@ async def test_api_connection(
     
     elif api_type == "openai":
         try:
-            api_key = api_credentials.get("openai_api_key")
+            api_key = (api_credentials.get("openai_api_key") or "").strip()
             if not api_key:
                 raise HTTPException(status_code=400, detail="API 키가 필요합니다.")
             
@@ -302,9 +302,9 @@ async def test_api_connection(
             raise HTTPException(status_code=400, detail=f"연결 실패: {str(e)}")
     
     elif api_type == "naver_ad":
-        api_key = api_credentials.get("naver_api_key")
-        secret_key = api_credentials.get("naver_secret_key")
-        customer_id = api_credentials.get("naver_customer_id")
+        api_key = (api_credentials.get("naver_api_key") or "").strip()
+        secret_key = (api_credentials.get("naver_secret_key") or "").strip()
+        customer_id = (api_credentials.get("naver_customer_id") or "").strip()
         if not api_key or not secret_key or not customer_id:
             raise HTTPException(status_code=400, detail="필수 키가 누락되었습니다.")
         
@@ -344,8 +344,8 @@ async def test_api_connection(
             raise HTTPException(status_code=400, detail=f"연결 실패: {str(e)}")
     
     elif api_type == "naver_search":
-        client_id = api_credentials.get("naver_client_id")
-        client_secret = api_credentials.get("naver_client_secret")
+        client_id = (api_credentials.get("naver_client_id") or "").strip()
+        client_secret = (api_credentials.get("naver_client_secret") or "").strip()
         if not client_id or not client_secret:
             raise HTTPException(status_code=400, detail="필수 키가 누락되었습니다.")
         
@@ -369,8 +369,8 @@ async def test_api_connection(
             raise HTTPException(status_code=400, detail=f"연결 실패: {str(e)}")
 
     elif api_type == "coupang":
-        access_key = api_credentials.get("coupang_access_key")
-        secret_key = api_credentials.get("coupang_secret_key")
+        access_key = (api_credentials.get("coupang_access_key") or "").strip()
+        secret_key = (api_credentials.get("coupang_secret_key") or "").strip()
         if not access_key or not secret_key:
             raise HTTPException(status_code=400, detail="필수 키가 누락되었습니다.")
         
