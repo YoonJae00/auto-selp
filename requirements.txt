@@ -6,8 +6,11 @@ curl_cffi
 python-dotenv
 fastapi
 uvicorn
-supabase
 python-multipart
 python-jose[cryptography]
 cryptography
 openai
+celery
+redis
+sqlalchemy
+psycopg2-binary

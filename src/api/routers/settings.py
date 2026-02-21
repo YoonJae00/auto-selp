@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
+from sqlalchemy.orm import Session
 from src.api.deps import get_current_user, get_db
+from src.api.models import User, UserSettings
 import os
 import google.generativeai as genai
 from cryptography.fernet import Fernet
@@ -118,30 +120,32 @@ def mask_api_keys(encrypted_keys: Dict[str, str]) -> Dict[str, str]:
 # ─── API 엔드포인트 ─────────────────────────────────────────────
 
 @router.get("/", response_model=UserSettingsResponse)
-async def get_settings(user=Depends(get_current_user)):
+async def get_settings(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """현재 사용자의 설정을 조회합니다."""
-    supabase = get_db()
     
-    # 사용자 설정 조회
-    response = supabase.table("user_settings").select("*").eq("user_id", user.id).execute()
+    settings_db = db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
     
-    if not response.data:
+    if not settings_db:
         # 설정이 없으면 기본값으로 생성
-        default_settings = {
-            "user_id": user.id,
-            "excel_column_mapping": {
-                "original_product_name": "A",
-                "refined_product_name": "B",
-                "keyword": "C",
-                "category": "D"
-            },
-            "api_keys": {},
-            "preferences": {}
-        }
-        insert_response = supabase.table("user_settings").insert(default_settings).execute()
-        settings = insert_response.data[0]
-    else:
-        settings = response.data[0]
+        settings_db = UserSettings(user_id=user.id)
+        db.add(settings_db)
+        db.commit()
+        db.refresh(settings_db)
+        
+    settings = {
+        "id": str(settings_db.id),
+        "user_id": str(settings_db.user_id),
+        "excel_column_mapping": settings_db.excel_column_mapping or {
+            "original_product_name": "A",
+            "refined_product_name": "B",
+            "keyword": "C",
+            "category": "D"
+        },
+        "api_keys": settings_db.api_keys or {},
+        "preferences": settings_db.preferences or {},
+        "created_at": settings_db.created_at.isoformat() if settings_db.created_at else "",
+        "updated_at": settings_db.updated_at.isoformat() if settings_db.updated_at else ""
+    }
     
     # API 키 마스킹 처리
     settings["api_keys"] = mask_api_keys(settings.get("api_keys", {}))
@@ -151,44 +155,46 @@ async def get_settings(user=Depends(get_current_user)):
 @router.put("/")
 async def update_settings(
     settings_update: UserSettingsUpdate,
-    user=Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """사용자 설정을 업데이트합니다."""
-    supabase = get_db()
     
-    # 기존 설정 조회
-    response = supabase.table("user_settings").select("*").eq("user_id", user.id).execute()
-    
-    update_data = {}
+    settings_db = db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
+    if not settings_db:
+        settings_db = UserSettings(user_id=user.id)
+        db.add(settings_db)
     
     # 엑셀 컬럼 매핑 업데이트
     if settings_update.excel_column_mapping:
-        update_data["excel_column_mapping"] = settings_update.excel_column_mapping.dict()
+        settings_db.excel_column_mapping = settings_update.excel_column_mapping.dict()
     
     # API 키 업데이트 (암호화)
     if settings_update.api_keys:
         encrypted_keys = encrypt_api_keys(settings_update.api_keys)
         # 기존 키와 병합 (부분 업데이트 지원)
-        if response.data:
-            existing_keys = response.data[0].get("api_keys", {})
-            existing_keys.update(encrypted_keys)
-            update_data["api_keys"] = existing_keys
-        else:
-            update_data["api_keys"] = encrypted_keys
+        existing_keys = dict(settings_db.api_keys) if settings_db.api_keys else {}
+        existing_keys.update(encrypted_keys)
+        settings_db.api_keys = existing_keys
     
     # 환경 설정 업데이트
     if settings_update.preferences:
-        update_data["preferences"] = settings_update.preferences
+        settings_db.preferences = settings_update.preferences
     
-    if not response.data:
-        # 설정이 없으면 새로 생성
-        update_data["user_id"] = user.id
-        result = supabase.table("user_settings").insert(update_data).execute()
-    else:
-        # 기존 설정 업데이트
-        result = supabase.table("user_settings").update(update_data).eq("user_id", user.id).execute()
+    db.commit()
+    db.refresh(settings_db)
     
-    return {"message": "설정이 업데이트되었습니다.", "data": result.data[0] if result.data else None}
+    response_data = {
+        "id": str(settings_db.id),
+        "user_id": str(settings_db.user_id),
+        "excel_column_mapping": settings_db.excel_column_mapping,
+        "api_keys": settings_db.api_keys,
+        "preferences": settings_db.preferences,
+        "created_at": settings_db.created_at.isoformat() if settings_db.created_at else "",
+        "updated_at": settings_db.updated_at.isoformat() if settings_db.updated_at else ""
+    }
+    
+    return {"message": "설정이 업데이트되었습니다.", "data": response_data}
 
 @router.post("/test-api/{api_type}")
 async def test_api_connection(
@@ -279,20 +285,19 @@ async def test_api_connection(
 @router.get("/api-keys/decrypt/{key_name}")
 async def get_decrypted_api_key(
     key_name: str,
-    user=Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     특정 API 키를 복호화하여 반환합니다. (내부 처리용)
     보안상 주의해서 사용해야 합니다.
     """
-    supabase = get_db()
+    settings_db = db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
     
-    response = supabase.table("user_settings").select("api_keys").eq("user_id", user.id).execute()
-    
-    if not response.data:
+    if not settings_db:
         raise HTTPException(status_code=404, detail="설정을 찾을 수 없습니다.")
     
-    api_keys = response.data[0].get("api_keys", {})
+    api_keys = settings_db.api_keys or {}
     encrypted_key = api_keys.get(key_name)
     
     if not encrypted_key:

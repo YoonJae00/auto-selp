@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict
+from sqlalchemy.orm import Session
 from src.api.deps import get_current_user, get_db
+from src.api.models import User, Prompt
 
 router = APIRouter(prefix="/api/prompts", tags=["prompts"])
 
@@ -17,6 +19,8 @@ class PromptUpdate(BaseModel):
     type: Optional[str] = None
 
 class PromptResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: str
     user_id: str
     type: str
@@ -99,110 +103,141 @@ def validate_template_variables(prompt_type: str, content: str):
 # ─── CRUD 엔드포인트 ─────────────────────────────────────────────
 
 @router.post("/", response_model=PromptResponse)
-def create_prompt(prompt: PromptCreate, user = Depends(get_current_user)):
-    db = get_db()
-
+def create_prompt(prompt: PromptCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # 템플릿 변수 검증
     validate_template_variables(prompt.type, prompt.content)
 
     # If setting active=True, deactivate others of same type
     if prompt.is_active:
-        db.table("prompts").update({"is_active": False}).eq("user_id", user.id).eq("type", prompt.type).execute()
+        db.query(Prompt).filter(Prompt.user_id == user.id, Prompt.type == prompt.type).update({"is_active": False})
 
-    data = {
-        "user_id": user.id,
-        "type": prompt.type,
-        "title": prompt.title,
-        "content": prompt.content,
-        "is_active": prompt.is_active if prompt.is_active is not None else False
+    new_prompt = Prompt(
+        user_id=user.id,
+        type=prompt.type,
+        title=prompt.title,
+        content=prompt.content,
+        is_active=prompt.is_active if prompt.is_active is not None else False
+    )
+    db.add(new_prompt)
+    db.commit()
+    db.refresh(new_prompt)
+    
+    # UUID를 string으로 변환해서 반환하기 위해 Pydantic 변환 전 dict로 맞춤
+    return {
+        "id": str(new_prompt.id),
+        "user_id": str(new_prompt.user_id),
+        "type": new_prompt.type,
+        "title": new_prompt.title,
+        "content": new_prompt.content,
+        "is_active": new_prompt.is_active
     }
-    res = db.table("prompts").insert(data).execute()
-    return res.data[0]
 
 @router.get("/", response_model=List[PromptResponse])
-def list_prompts(type: Optional[str] = None, user = Depends(get_current_user)):
-    db = get_db()
+def list_prompts(type: Optional[str] = None, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     
     # 1. Check if user has ANY prompts (간단한 조회로 확인)
-    check_query = db.table("prompts").select("id").eq("user_id", user.id).limit(1).execute()
-    if not check_query.data or len(check_query.data) == 0:
+    has_prompts = db.query(Prompt).filter(Prompt.user_id == user.id).first()
+    
+    if not has_prompts:
         # Seeding logic
         print(f"Seeding default prompts for user {user.id}")
-        seed_data = []
         for p in DEFAULT_PROMPTS:
-            seed_data.append({
-                "user_id": user.id,
-                "type": p["type"],
-                "title": p["title"],
-                "content": p["content"],
-                "is_active": p["is_active"]
-            })
-        if seed_data:
-            db.table("prompts").insert(seed_data).execute()
+            new_p = Prompt(
+                user_id=user.id,
+                type=p["type"],
+                title=p["title"],
+                content=p["content"],
+                is_active=p["is_active"]
+            )
+            db.add(new_p)
+        db.commit()
 
     # 2. Query prompts
-    query = db.table("prompts").select("*").eq("user_id", user.id)
+    query = db.query(Prompt).filter(Prompt.user_id == user.id)
     if type:
-        query = query.eq("type", type)
+        query = query.filter(Prompt.type == type)
     
     # Order by created_at desc
-    query = query.order("created_at", desc=True)
+    prompts = query.order_by(Prompt.created_at.desc()).all()
     
-    res = query.execute()
-    return res.data
+    return [
+        {
+            "id": str(p.id),
+            "user_id": str(p.user_id),
+            "type": p.type,
+            "title": p.title,
+            "content": p.content,
+            "is_active": p.is_active
+        } for p in prompts
+    ]
 
 @router.put("/{prompt_id}", response_model=PromptResponse)
-def update_prompt(prompt_id: str, prompt: PromptUpdate, user = Depends(get_current_user)):
-    db = get_db()
+def update_prompt(prompt_id: str, prompt: PromptUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     
     # Check ownership
-    existing = db.table("prompts").select("*").eq("id", prompt_id).eq("user_id", user.id).execute()
-    if not existing.data:
+    existing = db.query(Prompt).filter(Prompt.id == prompt_id, Prompt.user_id == user.id).first()
+    if not existing:
         raise HTTPException(status_code=404, detail="Prompt not found")
 
     update_data = prompt.dict(exclude_unset=True)
     if not update_data:
-        return existing.data[0]
+        return {
+            "id": str(existing.id), "user_id": str(existing.user_id), "type": existing.type,
+            "title": existing.title, "content": existing.content, "is_active": existing.is_active
+        }
 
     # 템플릿 변수 검증 (content가 변경되는 경우)
     if "content" in update_data:
-        prompt_type = update_data.get("type", existing.data[0]["type"])
+        prompt_type = update_data.get("type", existing.type)
         validate_template_variables(prompt_type, update_data["content"])
 
-    res = db.table("prompts").update(update_data).eq("id", prompt_id).execute()
-    return res.data[0]
+    for key, value in update_data.items():
+        setattr(existing, key, value)
+        
+    db.commit()
+    db.refresh(existing)
+    
+    return {
+        "id": str(existing.id), "user_id": str(existing.user_id), "type": existing.type,
+        "title": existing.title, "content": existing.content, "is_active": existing.is_active
+    }
 
 @router.delete("/{prompt_id}")
-def delete_prompt(prompt_id: str, user = Depends(get_current_user)):
-    db = get_db()
+def delete_prompt(prompt_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     
     # Check ownership
-    existing = db.table("prompts").select("*").eq("id", prompt_id).eq("user_id", user.id).execute()
-    if not existing.data:
+    existing = db.query(Prompt).filter(Prompt.id == prompt_id, Prompt.user_id == user.id).first()
+    if not existing:
         raise HTTPException(status_code=404, detail="Prompt not found")
 
     # Delete
-    db.table("prompts").delete().eq("id", prompt_id).execute()
+    db.delete(existing)
+    db.commit()
     
     return {"message": "Prompt deleted"}
 
 @router.put("/{prompt_id}/active")
-def activate_prompt(prompt_id: str, user = Depends(get_current_user)):
-    db = get_db()
+def activate_prompt(prompt_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     
     # 1. Get prompt type
-    prompt_res = db.table("prompts").select("type").eq("id", prompt_id).eq("user_id", user.id).execute()
-    if not prompt_res.data:
+    prompt = db.query(Prompt).filter(Prompt.id == prompt_id, Prompt.user_id == user.id).first()
+    if not prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")
     
-    prompt_type = prompt_res.data[0]['type']
+    prompt_type = prompt.type
 
     # 2. Deactivate all of this type for this user
-    db.table("prompts").update({"is_active": False}).eq("user_id", user.id).eq("type", prompt_type).execute()
+    db.query(Prompt).filter(Prompt.user_id == user.id, Prompt.type == prompt_type).update({"is_active": False})
 
     # 3. Activate target prompt
-    res = db.table("prompts").update({"is_active": True}).eq("id", prompt_id).execute()
-    return res.data[0]
+    prompt.is_active = True
+    db.commit()
+    db.refresh(prompt)
+    
+    return {
+        "id": str(prompt.id), "user_id": str(prompt.user_id), "type": prompt.type,
+        "title": prompt.title, "content": prompt.content, "is_active": prompt.is_active
+    }
 
 
 # ─── 추가 엔드포인트: 기본값 조회 / 초기화 ──────────────────────
@@ -213,16 +248,15 @@ def get_default_prompts():
     return DEFAULT_PROMPTS
 
 @router.put("/{prompt_id}/reset", response_model=PromptResponse)
-def reset_prompt_to_default(prompt_id: str, user = Depends(get_current_user)):
+def reset_prompt_to_default(prompt_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """프롬프트를 기본 템플릿 내용으로 초기화"""
-    db = get_db()
 
     # 1. Check ownership & get type
-    existing = db.table("prompts").select("*").eq("id", prompt_id).eq("user_id", user.id).execute()
-    if not existing.data:
+    existing = db.query(Prompt).filter(Prompt.id == prompt_id, Prompt.user_id == user.id).first()
+    if not existing:
         raise HTTPException(status_code=404, detail="Prompt not found")
 
-    prompt_type = existing.data[0]["type"]
+    prompt_type = existing.type
 
     # 2. Find matching default
     default = next((d for d in DEFAULT_PROMPTS if d["type"] == prompt_type), None)
@@ -230,9 +264,12 @@ def reset_prompt_to_default(prompt_id: str, user = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="해당 타입의 기본 템플릿이 없습니다.")
 
     # 3. Update to default content
-    res = db.table("prompts").update({
-        "title": default["title"],
-        "content": default["content"],
-    }).eq("id", prompt_id).execute()
+    existing.title = default["title"]
+    existing.content = default["content"]
+    db.commit()
+    db.refresh(existing)
 
-    return res.data[0]
+    return {
+        "id": str(existing.id), "user_id": str(existing.user_id), "type": existing.type,
+        "title": existing.title, "content": existing.content, "is_active": existing.is_active
+    }

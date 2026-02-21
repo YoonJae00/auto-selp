@@ -1,0 +1,81 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: auto_selp_prod_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${POSTGRES_DB:-auto_selp_db}
+    volumes:
+      - prod_pgdata:/var/lib/postgresql/data
+    networks:
+      - auto_selp_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: auto_selp_prod_redis
+    restart: always
+    networks:
+      - auto_selp_net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: auto_selp_prod_backend
+    restart: always
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@db:5432/${POSTGRES_DB:-auto_selp_db}
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-auto-selp-super-secret-dev-key}
+    networks:
+      - auto_selp_net
+    volumes:
+      - prod_uploads:/app/uploads
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: auto_selp_prod_worker
+    restart: always
+    # Using thread pool since tasks are I/O bound (calling APIs)
+    command: [ "celery", "-A", "src.celery_app.celery_app", "worker", "--loglevel=info", "--pool=threads", "--concurrency=4" ]
+    depends_on:
+      - db
+      - redis
+      - backend
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@db:5432/${POSTGRES_DB:-auto_selp_db}
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - auto_selp_net
+    volumes:
+      - prod_uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: auto_selp_prod_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - auto_selp_net
+
+networks:
+  auto_selp_net:
+
+
+volumes:
+  prod_pgdata:
+  prod_uploads:
