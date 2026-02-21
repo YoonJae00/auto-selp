@@ -49,19 +49,22 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 @router.post("/login")
 def login(request: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == request.username).first()
+    req_username = request.username.strip()
+    req_password = request.password.strip()
+
+    user = db.query(User).filter(User.username == req_username).first()
     
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="아이디 또는 비밀번호가 잘못되었습니다."
+            detail=f"존재하지 않는 아이디입니다. (입력창에 공백이 없는지 확인해주세요)"
         )
     
     # In a real app we would use hashed passwords, but using string comparison for simplicity as before
-    if user.hashed_password != request.password:
+    if user.hashed_password != req_password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="아이디 또는 비밀번호가 잘못되었습니다."
+            detail="비밀번호가 일치하지 않습니다."
         )
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -91,8 +94,11 @@ def verify_admin_code(request: AdminCodeRequest):
 
 @router.post("/register-admin")
 def register_admin(request: RegisterAdminRequest, db: Session = Depends(get_db)):
+    req_username = request.username.strip()
+    req_password = request.password.strip()
+
     # Check if a user with the username already exists
-    existing_user = db.query(User).filter(User.username == request.username).first()
+    existing_user = db.query(User).filter(User.username == req_username).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -100,8 +106,8 @@ def register_admin(request: RegisterAdminRequest, db: Session = Depends(get_db))
         )
         
     user = User(
-        username=request.username, 
-        hashed_password=request.password,
+        username=req_username, 
+        hashed_password=req_password,
         role="admin",
         is_profile_completed=True # Admins skip the regular profile setup
     )
@@ -124,8 +130,11 @@ def register_user(request: RegisterUserRequest, db: Session = Depends(get_db), c
             detail="관리자 권한이 필요합니다."
         )
         
+    req_username = request.username.strip()
+    req_password = request.password.strip()
+
     # Check if user already exists
-    existing_user = db.query(User).filter(User.username == request.username).first()
+    existing_user = db.query(User).filter(User.username == req_username).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -133,8 +142,8 @@ def register_user(request: RegisterUserRequest, db: Session = Depends(get_db), c
         )
         
     user = User(
-        username=request.username, 
-        hashed_password=request.password,
+        username=req_username, 
+        hashed_password=req_password,
         role="user",
         is_profile_completed=False # Needs to complete profile upon first login
     )
