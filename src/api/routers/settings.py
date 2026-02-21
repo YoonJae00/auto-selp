@@ -266,19 +266,118 @@ async def test_api_connection(
             return {"success": False, "message": f"연결 실패: {str(e)}"}
     
     elif api_type == "naver_ad":
-        # Naver 광고 API 테스트 (실제 API 호출은 생략, 키 형식만 검증)
-        required_keys = ["naver_api_key", "naver_secret_key", "naver_customer_id"]
-        if not all(k in api_credentials for k in required_keys):
-            return {"success": False, "message": "필수 키가 누락되었습니다."}
-        return {"success": True, "message": "Naver 광고 API 설정 완료"}
+        api_key = api_credentials.get("naver_api_key")
+        secret_key = api_credentials.get("naver_secret_key")
+        customer_id = api_credentials.get("naver_customer_id")
+        if not api_key or not secret_key or not customer_id:
+            raise HTTPException(status_code=400, detail="필수 키가 누락되었습니다.")
+        
+        try:
+            import time
+            import hmac
+            import hashlib
+            import base64
+            import httpx
+            
+            method = 'GET'
+            uri = '/keywordstool'
+            timestamp = str(round(time.time() * 1000))
+            message = f"{timestamp}.{method}.{uri}"
+            hash_val = hmac.new(bytes(secret_key, "utf-8"), bytes(message, "utf-8"), hashlib.sha256)
+            signature = base64.b64encode(hash_val.digest()).decode()
+            
+            headers = {
+                "Content-Type": "application/json; charset=UTF-8",
+                "X-Timestamp": timestamp,
+                "X-API-KEY": api_key,
+                "X-Customer": customer_id,
+                "X-Signature": signature
+            }
+            params = {'hintKeywords': '테스트', 'showDetail': '1'}
+            url = f"https://api.naver.com{uri}"
+            
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(url, headers=headers, params=params)
+                if response.status_code == 200:
+                    return {"success": True, "message": "Naver 광고 API 연결 성공"}
+                else:
+                    return {"success": False, "message": f"연결 실패: {response.text}"}
+        except Exception as e:
+            return {"success": False, "message": f"연결 실패: {str(e)}"}
     
     elif api_type == "naver_search":
-        # Naver 쇼핑 검색 API 테스트
-        required_keys = ["naver_client_id", "naver_client_secret"]
-        if not all(k in api_credentials for k in required_keys):
-            return {"success": False, "message": "필수 키가 누락되었습니다."}
-        return {"success": True, "message": "Naver 쇼핑 API 설정 완료"}
+        client_id = api_credentials.get("naver_client_id")
+        client_secret = api_credentials.get("naver_client_secret")
+        if not client_id or not client_secret:
+            raise HTTPException(status_code=400, detail="필수 키가 누락되었습니다.")
+        
+        try:
+            import httpx
+            url = "https://openapi.naver.com/v1/search/shop.json"
+            headers = {
+                "X-Naver-Client-Id": client_id,
+                "X-Naver-Client-Secret": client_secret
+            }
+            params = {"query": "테스트", "display": 1}
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(url, headers=headers, params=params)
+                if response.status_code == 200:
+                    return {"success": True, "message": "Naver 쇼핑 API 연결 성공"}
+                else:
+                    return {"success": False, "message": f"연결 실패: {response.text}"}
+        except Exception as e:
+            return {"success": False, "message": f"연결 실패: {str(e)}"}
+
+    elif api_type == "coupang":
+        access_key = api_credentials.get("coupang_access_key")
+        secret_key = api_credentials.get("coupang_secret_key")
+        if not access_key or not secret_key:
+            raise HTTPException(status_code=400, detail="필수 키가 누락되었습니다.")
+        
+        try:
+            import httpx
+            import hmac
+            import hashlib
+            from datetime import datetime
+            
+            method = "POST"
+            path = "/v2/providers/openapi/apis/api/v1/categorization/predict"
+            url = f"https://api-gateway.coupang.com{path}"
+            
+            datetime_str = datetime.utcnow().strftime('%y%m%dT%H%M%SZ')
+            message = datetime_str + method + path
+            
+            signature = hmac.new(
+                secret_key.encode('utf-8'),
+                message.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()
+            
+            authorization = f"CEA algorithm=HmacSHA256, access-key={access_key}, signed-date={datetime_str}, signature={signature}"
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": authorization
+            }
+            body = {
+                "productName": "테스트 상품",
+                "brand": "",
+                "attributes": {}
+            }
+            
+            with httpx.Client(timeout=5.0) as client:
+                response = client.post(url, headers=headers, json=body)
+                if response.status_code == 200:
+                    return {"success": True, "message": "Coupang API 연결 성공"}
+                else:
+                    return {"success": False, "message": f"연결 실패: {response.text}"}
+        except Exception as e:
+            return {"success": False, "message": f"연결 실패: {str(e)}"}
     
+    elif api_type == "nano_banana":
+        # Nano banana API는 선택이므로 기본적으로 연결 성공 반환 (추후 실제 검증 로직 추가)
+        return {"success": True, "message": "Nano Banana API 설정 완료"}
+
     else:
         raise HTTPException(status_code=400, detail="지원하지 않는 API 타입입니다.")
 

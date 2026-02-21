@@ -11,7 +11,7 @@ import { AlertCircle, Key, ArrowRight, Loader2 } from 'lucide-react';
 const ExcelProcessor = () => {
     const [activeJobId, setActiveJobId] = useState(null);
     const [isLoadingSettings, setIsLoadingSettings] = useState(true);
-    const [missingKeys, setMissingKeys] = useState([]);
+    const [keyStatuses, setKeyStatuses] = useState([]);
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -19,32 +19,29 @@ const ExcelProcessor = () => {
                 const response = await api.get('/settings');
                 const keys = response.data?.api_keys || {};
 
-                const missing = [];
+                const statuses = [
+                    {
+                        name: "LLM API 키 (Gemini 또는 OpenAI)",
+                        isMissing: !keys.gemini_api_key && !keys.openai_api_key
+                    },
+                    {
+                        name: "네이버 검색광고 API 키 세트 (키, 시크릿, 커스터머 ID)",
+                        isMissing: !keys.naver_api_key || !keys.naver_secret_key || !keys.naver_customer_id
+                    },
+                    {
+                        name: "네이버 쇼핑 검색 API 키 세트 (Client ID, Client Secret)",
+                        isMissing: !keys.naver_client_id || !keys.naver_client_secret
+                    },
+                    {
+                        name: "쿠팡 API 키 세트 (Access Key, Secret Key)",
+                        isMissing: !keys.coupang_access_key || !keys.coupang_secret_key
+                    }
+                ];
 
-                // 1. LLM Check
-                if (!keys.gemini_api_key && !keys.openai_api_key) {
-                    missing.push("LLM API 키 (Gemini 또는 OpenAI)");
-                }
-
-                // 2. Naver Ad Check
-                if (!keys.naver_api_key || !keys.naver_secret_key || !keys.naver_customer_id) {
-                    missing.push("네이버 검색광고 API 키 세트 (키, 시크릿, 커스터머 ID)");
-                }
-
-                // 3. Naver Search Check
-                if (!keys.naver_client_id || !keys.naver_client_secret) {
-                    missing.push("네이버 쇼핑 검색 API 키 세트 (Client ID, Client Secret)");
-                }
-
-                // 4. Coupang Check
-                if (!keys.coupang_access_key || !keys.coupang_secret_key) {
-                    missing.push("쿠팡 API 키 세트 (Access Key, Secret Key)");
-                }
-
-                setMissingKeys(missing);
+                setKeyStatuses(statuses);
             } catch (error) {
                 console.error("Failed to fetch settings:", error);
-                setMissingKeys(["설정 정보 (서버 연결 오류)"]);
+                setKeyStatuses([{ name: "설정 정보 (서버 연결 오류)", isMissing: true }]);
             } finally {
                 setIsLoadingSettings(false);
             }
@@ -59,6 +56,8 @@ const ExcelProcessor = () => {
             setActiveJobId(data.job_id);
         }
     };
+
+    const hasMissingKeys = keyStatuses.some(s => s.isMissing);
 
     const renderMissingKeysAlert = () => (
         <motion.div
@@ -77,9 +76,16 @@ const ExcelProcessor = () => {
                     <p className="text-foreground/80 mb-4 font-medium">
                         대량 엑셀 처리를 시작하려면 아래의 API 키가 반드시 필요합니다. 설정 페이지에서 누락된 키를 먼저 입력해주세요.
                     </p>
-                    <ul className="list-disc list-inside space-y-1.5 text-sm font-semibold mb-6">
-                        {missingKeys.map((item, idx) => (
-                            <li key={idx} className="text-destructive/80">{item}</li>
+                    <ul className="space-y-2.5 mb-6">
+                        {keyStatuses.map((item, idx) => (
+                            <li key={idx} className={`flex items-center gap-2 text-sm font-semibold ${item.isMissing ? 'text-destructive' : 'text-green-600 dark:text-green-500'}`}>
+                                {item.isMissing ? (
+                                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-destructive/20 text-destructive text-xs">✕</span>
+                                ) : (
+                                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-green-500/20 text-green-600 dark:text-green-500 text-xs">✓</span>
+                                )}
+                                {item.name}
+                            </li>
                         ))}
                     </ul>
                     <Link
@@ -117,7 +123,7 @@ const ExcelProcessor = () => {
                         <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
                         <p className="text-muted-foreground font-medium">API 키 상태를 확인 중입니다...</p>
                     </div>
-                ) : missingKeys.length > 0 ? (
+                ) : hasMissingKeys ? (
                     renderMissingKeysAlert()
                 ) : (
                     <div className="space-y-8">
