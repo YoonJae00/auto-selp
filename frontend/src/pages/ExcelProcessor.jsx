@@ -4,7 +4,7 @@ import { JobStatus } from '../components/dashboard/JobStatus';
 import { HistoryTable } from '../components/dashboard/HistoryTable';
 import { Layout } from '../components/layout/Layout';
 import { motion } from 'framer-motion';
-import { api } from '../api/client';
+import api from '../lib/api';
 import { Link } from 'react-router-dom';
 import { AlertCircle, Key, ArrowRight, Loader2 } from 'lucide-react';
 
