@@ -5,39 +5,41 @@ import api from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
-import { Lock, Mail, Loader2, Wand2 } from 'lucide-react';
+import { User, Mail, Phone, UserCircle2 } from 'lucide-react';
 
-const Login = () => {
+const ProfileSetup = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
 
-    const handleLogin = async (e) => {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+
+    const handleProfileSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
         try {
-            const response = await api.post('/api/auth/login', {
-                username,
-                password,
+            await api.post('/api/auth/update-profile', {
+                name,
+                email,
+                phone
             });
 
-            const { access_token, user } = response.data;
-            if (access_token) {
-                localStorage.setItem('access_token', access_token);
-                if (user) {
-                    localStorage.setItem('user', JSON.stringify(user));
-                }
-                // Trigger a page reload to cleanly set the new auth state in App.jsx
-                window.location.href = '/';
-            } else {
-                throw new Error('로그인에 실패했습니다. (토큰 없음)');
+            // Update local user state
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                user.is_profile_completed = true;
+                localStorage.setItem('user', JSON.stringify(user));
             }
+
+            // Redirect to dashboard
+            navigate('/');
         } catch (err) {
-            setError(err.response?.data?.detail || err.message || '로그인 중 오류가 발생했습니다.');
+            setError(err.response?.data?.detail || '프로필 업데이트 중 오류가 발생했습니다.');
         } finally {
             setLoading(false);
         }
@@ -45,7 +47,6 @@ const Login = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-gray-950 to-gray-950">
-            {/* Background Animated Orbs */}
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] animate-pulse" />
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px]" />
 
@@ -55,7 +56,7 @@ const Login = () => {
                 transition={{ duration: 0.5 }}
                 className="w-full max-w-md relative z-10"
             >
-                <Card className="border-white/5 bg-gray-950/60">
+                <Card className="border-white/5 bg-gray-950/60 p-8 shadow-2xl">
                     <div className="text-center mb-8">
                         <motion.div
                             initial={{ y: -20, opacity: 0 }}
@@ -63,31 +64,42 @@ const Login = () => {
                             transition={{ delay: 0.2 }}
                             className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/20 text-indigo-400 mb-4"
                         >
-                            <Wand2 className="w-6 h-6" />
+                            <UserCircle2 className="w-6 h-6" />
                         </motion.div>
                         <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                            Auto-Selp
+                            환영합니다!
                         </h1>
-                        <p className="text-gray-400 mt-2">자동화 관리를 위해 로그인하세요</p>
+                        <p className="text-gray-400 mt-2">
+                            시작하기 전에 추가 정보를 입력해 주세요.
+                        </p>
                     </div>
 
-                    <form onSubmit={handleLogin} className="space-y-6">
+                    <form onSubmit={handleProfileSubmit} className="space-y-6">
                         <div className="space-y-4">
                             <Input
                                 type="text"
-                                placeholder="아이디"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder="이름 (담당자명)"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                icon={<User className="w-5 h-5 text-gray-500" />}
+                                required
+                                className="bg-black/20"
+                            />
+                            <Input
+                                type="email"
+                                placeholder="이메일 주소"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 icon={<Mail className="w-5 h-5 text-gray-500" />}
                                 required
                                 className="bg-black/20"
                             />
                             <Input
-                                type="password"
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                icon={<Lock className="w-5 h-5 text-gray-500" />}
+                                type="tel"
+                                placeholder="연락처 (010-0000-0000)"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                icon={<Phone className="w-5 h-5 text-gray-500" />}
                                 required
                                 className="bg-black/20"
                             />
@@ -108,12 +120,8 @@ const Login = () => {
                             className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border-none h-12 text-lg font-semibold shadow-xl shadow-indigo-500/20"
                             isLoading={loading}
                         >
-                            로그인
+                            시작하기
                         </Button>
-
-                        <p className="text-center text-xs text-gray-500 mt-4">
-                            계정이 없으신가요? 관리자에게 문의하세요.
-                        </p>
                     </form>
                 </Card>
             </motion.div>
@@ -121,4 +129,4 @@ const Login = () => {
     );
 };
 
-export default Login;
+export default ProfileSetup;

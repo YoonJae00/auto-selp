@@ -52,7 +52,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             user = db.query(User).first()
             if not user:
                 # Create a dummy user
-                user = User(email="admin@auto-selp.local", hashed_password="hashed")
+                user = User(username="admin", role="admin", is_profile_completed=True, hashed_password="hashed")
                 db.add(user)
                 db.commit()
                 db.refresh(user)
