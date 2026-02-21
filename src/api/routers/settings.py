@@ -200,7 +200,8 @@ async def update_settings(
 async def test_api_connection(
     api_type: str,
     api_credentials: Dict[str, str] = Body(...),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     API 연결을 테스트합니다.
@@ -210,7 +211,38 @@ async def test_api_connection(
     - openai: OpenAI API
     - naver_ad: Naver 광고 API
     - naver_search: Naver 쇼핑 검색 API
+    - coupang: Coupang Open API
     """
+    
+    # 마스킹된 키("••••")가 전달된 경우, DB 또는 환경변수에서 실제 키를 가져옵니다.
+    settings_db = db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
+    db_keys = settings_db.api_keys if settings_db else {}
+    
+    env_key_map = {
+        "gemini_api_key": "GEMINI_API_KEY",
+        "openai_api_key": "OPENAI_API_KEY",
+        "naver_api_key": "NAVER_API_KEY",
+        "naver_secret_key": "NAVER_SECRET_KEY",
+        "naver_customer_id": "NAVER_CUSTOMER_ID",
+        "naver_client_id": "NAVER_CLIENT_ID",
+        "naver_client_secret": "NAVER_CLIENT_SECRET",
+        "coupang_access_key": "COUPANG_ACCESS_KEY",
+        "coupang_secret_key": "COUPANG_SECRET_KEY",
+        "nano_banana_api_key": "NANO_BANANA_API_KEY",
+    }
+    
+    for key, value in api_credentials.items():
+        if value and "••••" in value:
+            # DB에서 먼저 확인
+            encrypted_val = db_keys.get(key)
+            if encrypted_val:
+                real_val = decrypt_api_key(encrypted_val)
+                api_credentials[key] = real_val if real_val else value
+            else:
+                # DB에 없으면 환경변수에서 로드 시도
+                env_val = os.getenv(env_key_map.get(key, ""))
+                if env_val:
+                    api_credentials[key] = env_val
     
     if api_type == "gemini":
         try:
