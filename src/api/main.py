@@ -4,6 +4,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from src.api.database import engine, Base
+from src.api.models import User, Prompt, Job, UserSettings
+
+# 데이터베이스 테이블 생성 (개발 환경용)
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI(title="Auto-Selp API", version="1.0.0")
 
 # CORS Setup

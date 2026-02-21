@@ -2,20 +2,18 @@ import shutil
 import os
 import uuid
 import json
-from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, UploadFile, File, Depends, Form, HTTPException
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
 from src.api.deps import get_current_user, get_db
-from src.api.worker import process_excel_job
+from src.api.models import User, Job
+from src.tasks import run_excel_processing_job
 from src.excel_handler import ExcelHandler
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-# Thread pool for background jobs
-executor = ThreadPoolExecutor(max_workers=4)  # Run up to 4 jobs concurrently
 
 @router.post("/preview")
 def preview_excel(
@@ -61,7 +59,8 @@ def create_job(
     column_mapping: str = Form(...),  # JSON string
     parallel_count: int = Form(1),  # Number of parallel workers (1-10)
     processing_options: str = Form(None), # JSON string, optional
-    user = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     엑셀 파일을 업로드하고 처리 작업을 시작합니다.
@@ -133,64 +132,83 @@ def create_job(
     ]
 
     # 4. Create Job in DB
-    db = get_db()
-    job_data = {
-        "user_id": user.id,
-        "input_file_path": file_path,
-        "status": "pending",
-        "progress": 0,
-        "meta_data": {
+    job_db = Job(
+        user_id=user.id,
+        input_file_path=file_path,
+        status="pending",
+        progress=0,
+        meta_data={
             "original_filename": file.filename,
             "column_mapping": mapping,
             "parallel_count": parallel_count,
             "processing_options": options,
             "chunks": chunks
         }
-    }
-    res = db.table("jobs").insert(job_data).execute()
-    job_id = res.data[0]['id']
+    )
+    db.add(job_db)
+    db.commit()
+    db.refresh(job_db)
+    job_id = str(job_db.id)
 
-    # 5. Submit job to thread pool (non-blocking)
-    executor.submit(process_excel_job, job_id, user.id, file_path)
+    # 5. Submit job to Celery queue (non-blocking)
+    run_excel_processing_job.delay(job_id, str(user.id), file_path)
 
     return {"job_id": job_id, "status": "pending"}
 
 @router.get("/")
-def list_jobs(user = Depends(get_current_user)):
+def list_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     사용자의 모든 작업 목록을 조회합니다 (최신순).
     """
-    db = get_db()
-    res = db.table("jobs").select("*").eq("user_id", user.id).order("created_at", desc=True).execute()
-    return res.data
+    jobs = db.query(Job).filter(Job.user_id == user.id).order_by(Job.created_at.desc()).all()
+    # ORM 객체를 dict 로 변환하여 리턴 (Pydantic 모델을 쓰는게 베스트이나 일단 딕셔너리로 호환성 유지)
+    return [{
+        "id": str(j.id),
+        "user_id": str(j.user_id),
+        "status": j.status,
+        "input_file_path": j.input_file_path,
+        "output_file_path": j.output_file_path,
+        "progress": j.progress,
+        "error_message": j.error_message,
+        "meta_data": j.meta_data,
+        "created_at": j.created_at.isoformat() if j.created_at else None,
+        "updated_at": j.updated_at.isoformat() if j.updated_at else None
+    } for j in jobs]
 
 @router.get("/{job_id}")
-def get_job_status(job_id: str, user = Depends(get_current_user)):
-    db = get_db()
-    res = db.table("jobs").select("*").eq("id", job_id).eq("user_id", user.id).execute()
-    if not res.data:
+def get_job_status(job_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    if not job:
         return {"error": "Job not found"}
-    return res.data[0]
+    return {
+        "id": str(job.id),
+        "user_id": str(job.user_id),
+        "status": job.status,
+        "input_file_path": job.input_file_path,
+        "output_file_path": job.output_file_path,
+        "progress": job.progress,
+        "error_message": job.error_message,
+        "meta_data": job.meta_data,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "updated_at": job.updated_at.isoformat() if job.updated_at else None
+    }
 
 @router.get("/{job_id}/download/result")
-def download_result(job_id: str, user = Depends(get_current_user)):
+def download_result(job_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """처리된 결과 파일을 다운로드합니다."""
-    db = get_db()
-    job = db.table("jobs").select("*").eq("id", job_id).eq("user_id", user.id).execute()
+    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
     
-    if not job.data:
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    job_data = job.data[0]
-    
-    if job_data['status'] != 'completed':
+    if job.status != 'completed':
         raise HTTPException(status_code=400, detail="Job not completed yet")
     
-    output_path = job_data.get('output_file_path')
+    output_path = job.output_file_path
     if not output_path or not os.path.exists(output_path):
         raise HTTPException(status_code=404, detail="Result file not found")
     
-    original_filename = job_data.get('meta_data', {}).get('original_filename', 'result.xlsx')
+    original_filename = job.meta_data.get('original_filename', 'result.xlsx') if job.meta_data else 'result.xlsx'
     result_filename = f"processed_{original_filename}"
     
     return FileResponse(
@@ -200,21 +218,19 @@ def download_result(job_id: str, user = Depends(get_current_user)):
     )
 
 @router.get("/{job_id}/download/original")
-def download_original(job_id: str, user = Depends(get_current_user)):
+def download_original(job_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """원본 파일을 다운로드합니다."""
-    db = get_db()
-    job = db.table("jobs").select("*").eq("id", job_id).eq("user_id", user.id).execute()
+    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
     
-    if not job.data:
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    job_data = job.data[0]
-    input_path = job_data.get('input_file_path')
+    input_path = job.input_file_path
     
     if not input_path or not os.path.exists(input_path):
         raise HTTPException(status_code=404, detail="Original file not found")
     
-    original_filename = job_data.get('meta_data', {}).get('original_filename', 'original.xlsx')
+    original_filename = job.meta_data.get('original_filename', 'original.xlsx') if job.meta_data else 'original.xlsx'
     
     return FileResponse(
         path=input_path,
@@ -223,38 +239,30 @@ def download_original(job_id: str, user = Depends(get_current_user)):
     )
 
 @router.delete("/{job_id}/cancel")
-def cancel_job(job_id: str, user = Depends(get_current_user)):
+def cancel_job(job_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     진행 중인 작업을 취소합니다.
     """
-    db = get_db()
-    
-    # Get job
-    job_res = db.table("jobs").select("*").eq("id", job_id).eq("user_id", user.id).execute()
-    if not job_res.data:
+    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    job = job_res.data[0]
-    
     # Only allow cancelling pending or processing jobs
-    if job['status'] not in ['pending', 'processing']:
+    if job.status not in ['pending', 'processing']:
         raise HTTPException(
             status_code=400, 
-            detail=f"Cannot cancel job with status: {job['status']}"
+            detail=f"Cannot cancel job with status: {job.status}"
         )
     
     # Update job status to cancelled with timestamp
     from datetime import datetime
-    meta_data = job.get('meta_data', {})
+    meta_data = dict(job.meta_data) if job.meta_data else {}
+    meta_data["cancelled_at"] = datetime.now().isoformat()
     
-    db.table("jobs").update({
-        "status": "cancelled",
-        "error_message": "User cancelled the job",
-        "meta_data": {
-            **meta_data,
-            "cancelled_at": datetime.now().isoformat()
-        }
-    }).eq("id", job_id).execute()
+    job.status = "cancelled"
+    job.error_message = "User cancelled the job"
+    job.meta_data = meta_data
+    db.commit()
     
     return {"message": "Job cancelled successfully", "job_id": job_id}
 

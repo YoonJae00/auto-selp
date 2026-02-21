@@ -1,4 +1,5 @@
-from src.api.database import get_db
+from src.api.database import get_db, SessionLocal
+from src.api.models import Job, Prompt, UserSettings
 from src.excel_handler import ExcelHandler
 from src.product_name_processor import ProductNameProcessor
 from src.keyword_processor import KeywordProcessor
@@ -30,141 +31,134 @@ def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, k
     Returns:
         List of processed results
     """
-    db = get_db()
-    pn_processor = ProductNameProcessor(llm_provider=llm_provider)
-    kw_processor = KeywordProcessor(llm_provider=llm_provider)
-    
-    results = []
-    total_in_chunk = len(data_chunk)
-    
-    # Update chunk status to processing
-    chunks = meta_data.get("chunks", [])
-    if chunk_id < len(chunks):
-        chunks[chunk_id]["status"] = "processing"
-        chunks[chunk_id]["total_rows"] = total_in_chunk
+    db = SessionLocal()
+    try:
+        pn_processor = ProductNameProcessor(llm_provider=llm_provider)
+        kw_processor = KeywordProcessor(llm_provider=llm_provider)
         
-        db.table("jobs").update({
-            "meta_data": {
-                **meta_data,
-                "chunks": chunks
+        results = []
+        total_in_chunk = len(data_chunk)
+        
+        # Update chunk status to processing
+        chunks = meta_data.get("chunks", [])
+        if chunk_id < len(chunks):
+            chunks[chunk_id]["status"] = "processing"
+            chunks[chunk_id]["total_rows"] = total_in_chunk
+            
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if job:
+                job_meta = dict(job.meta_data) if job.meta_data else {}
+                job_meta["chunks"] = chunks
+                job.meta_data = job_meta
+                db.commit()
+        
+        if processing_options is None:
+            processing_options = {"refine_name": True, "keyword": True, "category": True, "coupang": False}
+
+        for index, item in enumerate(data_chunk):
+            # Check if job has been cancelled
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if job and job.status == "cancelled":
+                print(f"Job {job_id} was cancelled by user (chunk {chunk_id})")
+                return results
+            
+            p_name = item.get('product_name', '')
+            current_row = item['row_index']
+            
+            if not p_name.strip():
+                continue
+            
+            refined_name = p_name
+            if processing_options.get("refine_name", True):
+                refined_name = pn_processor.refine_product_name(p_name, prompt_template=pn_prompt)
+            
+            keywords = ""
+            if processing_options.get("keyword", True):
+                keywords = kw_processor.process_keywords(refined_name, prompt_template=kw_prompt)
+            
+            category_code = ""
+            if processing_options.get("category", True):
+                category_code = cat_processor.get_category_code(refined_name)
+
+            coupang_category_code = ""
+            if processing_options.get("coupang", False) and coupang_processor:
+                coupang_category_code = coupang_processor.get_category_code(refined_name)
+            
+            result_item = {
+                'row_index': item['row_index'],
+                'image_url': ''
             }
-        }).eq("id", job_id).execute()
-    
-    if processing_options is None:
-        processing_options = {"refine_name": True, "keyword": True, "category": True, "coupang": False}
-
-    for index, item in enumerate(data_chunk):
-        # Check if job has been cancelled
-        job_status_check = db.table("jobs").select("status").eq("id", job_id).execute()
-        if job_status_check.data and job_status_check.data[0].get("status") == "cancelled":
-            print(f"Job {job_id} was cancelled by user (chunk {chunk_id})")
-            return results
-        
-        p_name = item.get('product_name', '')
-        current_row = item['row_index']
-        
-        # Skip empty rows if we are refining product name, otherwise we might still process if p_name is present
-        if not p_name.strip():
-            continue
-        
-        # Process product name
-        refined_name = p_name
-        if processing_options.get("refine_name", True):
-            refined_name = pn_processor.refine_product_name(p_name, prompt_template=pn_prompt)
-        
-        # Process keywords
-        keywords = ""
-        if processing_options.get("keyword", True):
-            keywords = kw_processor.process_keywords(refined_name, prompt_template=kw_prompt)
-        
-        # Process category (Naver)
-        category_code = ""
-        if processing_options.get("category", True):
-            category_code = cat_processor.get_category_code(refined_name)
-
-        # Process Coupang Category
-        coupang_category_code = ""
-        if processing_options.get("coupang", False) and coupang_processor:
-            coupang_category_code = coupang_processor.get_category_code(refined_name)
-        
-        # Store result
-        result_item = {
-            'row_index': item['row_index'],
-            'image_url': ''
-        }
-        
-        if processing_options.get("refine_name", True):
-             result_item['refined_name'] = refined_name
-             
-        if processing_options.get("keyword", True):
-             result_item['keywords'] = keywords
-             
-        if processing_options.get("category", True):
-             result_item['category_code'] = category_code
-
-        if processing_options.get("coupang", False):
-             result_item['coupang_category_code'] = coupang_category_code
-             
-        results.append(result_item)
-        
-        # Update chunk progress every 5 rows or at the end
-        if (index + 1) % 5 == 0 or index == total_in_chunk - 1:
-            progress = int((index + 1) / total_in_chunk * 100)
             
-            # Get fresh metadata to avoid overwriting other chunks' updates
-            job_res = db.table("jobs").select("meta_data").eq("id", job_id).execute()
-            if job_res.data:
-                current_meta = job_res.data[0].get("meta_data", {})
-                current_chunks = current_meta.get("chunks", [])
+            if processing_options.get("refine_name", True):
+                 result_item['refined_name'] = refined_name
+                 
+            if processing_options.get("keyword", True):
+                 result_item['keywords'] = keywords
+                 
+            if processing_options.get("category", True):
+                 result_item['category_code'] = category_code
+
+            if processing_options.get("coupang", False):
+                 result_item['coupang_category_code'] = coupang_category_code
+                 
+            results.append(result_item)
+            
+            # Update chunk progress every 5 rows or at the end
+            if (index + 1) % 5 == 0 or index == total_in_chunk - 1:
+                progress = int((index + 1) / total_in_chunk * 100)
                 
-                if chunk_id < len(current_chunks):
-                    current_chunks[chunk_id]["progress"] = progress
-                    current_chunks[chunk_id]["rows_processed"] = index + 1
-                    current_chunks[chunk_id]["last_updated"] = datetime.now().isoformat()
+                job = db.query(Job).filter(Job.id == job_id).first()
+                if job and job.meta_data:
+                    current_meta = dict(job.meta_data)
+                    current_chunks = current_meta.get("chunks", [])
                     
-                    db.table("jobs").update({
-                        "meta_data": {
-                            **current_meta,
-                            "chunks": current_chunks
-                        }
-                    }).eq("id", job_id).execute()
-    
-    # Mark chunk as completed
-    job_res = db.table("jobs").select("meta_data").eq("id", job_id).execute()
-    if job_res.data:
-        current_meta = job_res.data[0].get("meta_data", {})
-        current_chunks = current_meta.get("chunks", [])
+                    if chunk_id < len(current_chunks):
+                        current_chunks[chunk_id]["progress"] = progress
+                        current_chunks[chunk_id]["rows_processed"] = index + 1
+                        current_chunks[chunk_id]["last_updated"] = datetime.now().isoformat()
+                        
+                        current_meta["chunks"] = current_chunks
+                        job.meta_data = current_meta
+                        db.commit()
         
-        if chunk_id < len(current_chunks):
-            current_chunks[chunk_id]["status"] = "completed"
-            current_chunks[chunk_id]["progress"] = 100
+        # Mark chunk as completed
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if job and job.meta_data:
+            current_meta = dict(job.meta_data)
+            current_chunks = current_meta.get("chunks", [])
             
-            db.table("jobs").update({
-                "meta_data": {
-                    **current_meta,
-                    "chunks": current_chunks
-                }
-            }).eq("id", job_id).execute()
-    
-    return results
+            if chunk_id < len(current_chunks):
+                current_chunks[chunk_id]["status"] = "completed"
+                current_chunks[chunk_id]["progress"] = 100
+                
+                current_meta["chunks"] = current_chunks
+                job.meta_data = current_meta
+                db.commit()
+        
+        return results
+        
+    finally:
+        db.close()
 
 
 def process_excel_job(job_id: str, user_id: str, file_path: str):
-    db = get_db()
+    db = SessionLocal()
     start_time = time.time()
     
     # 1. Fetch existing job metadata first
-    job_res = db.table("jobs").select("meta_data").eq("id", job_id).execute()
-    existing_meta_data = job_res.data[0].get("meta_data", {}) if job_res.data else {}
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        print(f"Job not found: {job_id}")
+        db.close()
+        return
+        
+    existing_meta_data = dict(job.meta_data) if job.meta_data else {}
     
     # 2. Update Status -> processing with start time (preserve existing meta_data)
-    db.table("jobs").update({
-        "status": "processing",
-        "meta_data": {
-            **existing_meta_data,
-            "processing_started_at": datetime.now().isoformat()
-        }
-    }).eq("id", job_id).execute()
+    existing_meta_data["processing_started_at"] = datetime.now().isoformat()
+    job.status = "processing"
+    job.meta_data = existing_meta_data
+    db.commit()
 
     try:
         # 3. Extract configuration from metadata
@@ -200,21 +194,20 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
             raise ValueError("Coupang Category column is required when option is enabled")
         
         # 4. Fetch User's Active Prompts
-        pn_res = db.table("prompts").select("content").eq("user_id", user_id).eq("type", "product_name").eq("is_active", True).execute()
-        pn_prompt = pn_res.data[0]['content'] if pn_res.data else None
+        pn_prompt_db = db.query(Prompt).filter(Prompt.user_id == user_id, Prompt.type == "product_name", Prompt.is_active == True).first()
+        pn_prompt = pn_prompt_db.content if pn_prompt_db else None
 
-        kw_res = db.table("prompts").select("content").eq("user_id", user_id).eq("type", "keyword").eq("is_active", True).execute()
-        kw_prompt = kw_res.data[0]['content'] if kw_res.data else None
+        kw_prompt_db = db.query(Prompt).filter(Prompt.user_id == user_id, Prompt.type == "keyword", Prompt.is_active == True).first()
+        kw_prompt = kw_prompt_db.content if kw_prompt_db else None
 
         # 5. Get user's LLM provider preference and API key
-        settings_res = db.table("user_settings").select("preferences, api_keys").eq("user_id", user_id).execute()
+        user_settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
         llm_provider_type = "gemini"  # default
         llm_api_key = None
         
-        if settings_res.data:
-            user_settings = settings_res.data[0]
-            preferences = user_settings.get("preferences", {})
-            api_keys = user_settings.get("api_keys", {})
+        if user_settings:
+            preferences = user_settings.preferences or {}
+            api_keys = user_settings.api_keys or {}
             
             # Get LLM provider preference
             llm_provider_type = preferences.get("llm_provider", "gemini")
@@ -250,9 +243,8 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
         
         # Update total_rows in metadata
         meta_data["total_rows"] = total_rows
-        db.table("jobs").update({
-            "meta_data": meta_data
-        }).eq("id", job_id).execute()
+        job.meta_data = meta_data
+        db.commit()
         
         # 7. Split data into chunks
         chunk_size = (total_rows + parallel_count - 1) // parallel_count  # Ceiling division
@@ -297,9 +289,8 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
                     completed_chunks = sum(1 for _, f in futures if f.done())
                     overall_progress = int((completed_chunks / len(futures)) * 100)
                     
-                    db.table("jobs").update({
-                        "progress": overall_progress
-                    }).eq("id", job_id).execute()
+                    job.progress = overall_progress
+                    db.commit()
                     
                 except Exception as e:
                     print(f"Error processing chunk {chunk_id}: {e}")
@@ -311,23 +302,20 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
         # 10. Save Result to Excel
         output_path = excel_handler.save_results(file_path, all_results, column_mapping)
 
-        db.table("jobs").update({
-            "status": "completed", 
-            "progress": 100, 
-            "output_file_path": output_path,
-            "meta_data": {
-                **meta_data,
-                "completed_at": datetime.now().isoformat()
-            }
-        }).eq("id", job_id).execute()
+        meta_data["completed_at"] = datetime.now().isoformat()
+        job.status = "completed"
+        job.progress = 100
+        job.output_file_path = output_path
+        job.meta_data = meta_data
+        db.commit()
 
     except Exception as e:
         print(f"Job Failed: {e}")
-        db.table("jobs").update({
-            "status": "failed", 
-            "error_message": str(e),
-            "meta_data": {
-                **meta_data,
-                "failed_at": datetime.now().isoformat()
-            }
-        }).eq("id", job_id).execute()
+        meta_data["failed_at"] = datetime.now().isoformat()
+        job.status = "failed"
+        job.error_message = str(e)
+        job.meta_data = meta_data
+        db.commit()
+        
+    finally:
+        db.close()
