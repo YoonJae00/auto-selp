@@ -16,9 +16,15 @@ FROM nginx:alpine
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Add a custom nginx configuration to handle React Router client-side routing
 RUN echo 'server { \
     listen 80; \
+    location /api/ { \
+    proxy_pass http://backend:8000; \
+    proxy_set_header Host $host; \
+    proxy_set_header X-Real-IP $remote_addr; \
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+    proxy_set_header X-Forwarded-Proto $scheme; \
+    } \
     location / { \
     root /usr/share/nginx/html; \
     index index.html index.htm; \
