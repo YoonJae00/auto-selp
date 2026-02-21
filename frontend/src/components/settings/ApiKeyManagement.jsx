@@ -69,7 +69,7 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
                 {
                     key: 'gemini_api_key',
                     label: 'API 키',
-                    placeholder: 'AIzaSy...',
+                    placeholder: 'API 키를 입력하세요',
                     type: 'password'
                 }
             ]
@@ -82,7 +82,7 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
                 {
                     key: 'openai_api_key',
                     label: 'API 키',
-                    placeholder: 'sk-proj-...',
+                    placeholder: 'sk-...',
                     type: 'password'
                 }
             ]
@@ -95,19 +95,19 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
                 {
                     key: 'naver_api_key',
                     label: 'API 키',
-                    placeholder: '0100000000...',
+                    placeholder: 'API 키를 입력하세요',
                     type: 'password'
                 },
                 {
                     key: 'naver_secret_key',
                     label: 'Secret 키',
-                    placeholder: 'AQAAAACs...',
+                    placeholder: 'Secret 키를 입력하세요',
                     type: 'password'
                 },
                 {
                     key: 'naver_customer_id',
                     label: 'Customer ID',
-                    placeholder: '2949678',
+                    placeholder: '고객 ID를 입력하세요',
                     type: 'text'
                 }
             ]
@@ -120,13 +120,13 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
                 {
                     key: 'naver_client_id',
                     label: 'Client ID',
-                    placeholder: 'E0a_unupf...',
+                    placeholder: 'Client ID를 입력하세요',
                     type: 'password'
                 },
                 {
                     key: 'naver_client_secret',
                     label: 'Client Secret',
-                    placeholder: 'IXrAF6u8XL',
+                    placeholder: 'Client Secret을 입력하세요',
                     type: 'password'
                 }
             ]
