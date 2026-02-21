@@ -257,7 +257,9 @@ async def test_api_connection(
             
             return {"success": True, "message": "Gemini API 연결 성공"}
         except Exception as e:
-            return {"success": False, "message": f"연결 실패: {str(e)}"}
+            if isinstance(e, HTTPException):
+                raise
+            raise HTTPException(status_code=400, detail=f"연결 실패: {str(e)}")
     
     elif api_type == "openai":
         try:
@@ -295,7 +297,9 @@ async def test_api_connection(
             
             return {"success": True, "message": "OpenAI API 연결 성공"}
         except Exception as e:
-            return {"success": False, "message": f"연결 실패: {str(e)}"}
+            if isinstance(e, HTTPException):
+                raise
+            raise HTTPException(status_code=400, detail=f"연결 실패: {str(e)}")
     
     elif api_type == "naver_ad":
         api_key = api_credentials.get("naver_api_key")
@@ -333,9 +337,11 @@ async def test_api_connection(
                 if response.status_code == 200:
                     return {"success": True, "message": "Naver 광고 API 연결 성공"}
                 else:
-                    return {"success": False, "message": f"연결 실패: {response.text}"}
+                    raise HTTPException(status_code=400, detail=f"연결 실패: {response.text}")
         except Exception as e:
-            return {"success": False, "message": f"연결 실패: {str(e)}"}
+            if isinstance(e, HTTPException):
+                raise
+            raise HTTPException(status_code=400, detail=f"연결 실패: {str(e)}")
     
     elif api_type == "naver_search":
         client_id = api_credentials.get("naver_client_id")
@@ -356,9 +362,11 @@ async def test_api_connection(
                 if response.status_code == 200:
                     return {"success": True, "message": "Naver 쇼핑 API 연결 성공"}
                 else:
-                    return {"success": False, "message": f"연결 실패: {response.text}"}
+                    raise HTTPException(status_code=400, detail=f"연결 실패: {response.text}")
         except Exception as e:
-            return {"success": False, "message": f"연결 실패: {str(e)}"}
+            if isinstance(e, HTTPException):
+                raise
+            raise HTTPException(status_code=400, detail=f"연결 실패: {str(e)}")
 
     elif api_type == "coupang":
         access_key = api_credentials.get("coupang_access_key")
@@ -402,9 +410,11 @@ async def test_api_connection(
                 if response.status_code == 200:
                     return {"success": True, "message": "Coupang API 연결 성공"}
                 else:
-                    return {"success": False, "message": f"연결 실패: {response.text}"}
+                    raise HTTPException(status_code=400, detail=f"연결 실패: {response.text}")
         except Exception as e:
-            return {"success": False, "message": f"연결 실패: {str(e)}"}
+            if isinstance(e, HTTPException):
+                raise
+            raise HTTPException(status_code=400, detail=f"연결 실패: {str(e)}")
     
     elif api_type == "nano_banana":
         # Nano banana API는 선택이므로 기본적으로 연결 성공 반환 (추후 실제 검증 로직 추가)
