@@ -188,20 +188,27 @@ export const ApiKeyManagement = ({ apiKeys, onChange, onSave, isSaving }) => {
                         </div>
 
                         {testResults[section.apiType] && (
-                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${testResults[section.apiType].success
+                            <div className={`flex flex-col gap-1 px-3 py-1.5 rounded-lg text-sm ${testResults[section.apiType].success
                                 ? 'bg-green-500/10 text-green-400 border border-green-500/20'
                                 : 'bg-red-500/10 text-red-400 border border-red-500/20'
                                 }`}>
-                                {testResults[section.apiType].success ? (
-                                    <>
-                                        <CheckCircle2 className="w-4 h-4" />
-                                        연결 성공
-                                    </>
-                                ) : (
-                                    <>
-                                        <XCircle className="w-4 h-4" />
-                                        연결 실패
-                                    </>
+                                <div className="flex items-center gap-2">
+                                    {testResults[section.apiType].success ? (
+                                        <>
+                                            <CheckCircle2 className="w-4 h-4" />
+                                            연결 성공
+                                        </>
+                                    ) : (
+                                        <>
+                                            <XCircle className="w-4 h-4" />
+                                            연결 실패
+                                        </>
+                                    )}
+                                </div>
+                                {!testResults[section.apiType].success && testResults[section.apiType].message && (
+                                    <div className="text-xs opacity-80 mt-1 pl-6">
+                                        {testResults[section.apiType].message}
+                                    </div>
                                 )}
                             </div>
                         )}
