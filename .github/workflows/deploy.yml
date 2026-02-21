@@ -31,6 +31,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/auto-selp-backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
 
       - name: Build and push frontend
         uses: docker/build-push-action@v4
@@ -40,11 +42,25 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/auto-selp-frontend:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
 
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+
+      - name: Copy docker-compose via SCP
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "docker-compose.yml"
+          target: "/opt/auto-selp/"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:

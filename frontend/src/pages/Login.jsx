@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { supabase } from '../lib/supabase';
+import api from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -20,15 +20,21 @@ const Login = () => {
         setError(null);
 
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const response = await api.post('/api/auth/login', {
                 email,
                 password,
             });
 
-            if (error) throw error;
-            navigate('/');
+            const { access_token } = response.data;
+            if (access_token) {
+                localStorage.setItem('access_token', access_token);
+                // Trigger a page reload to cleanly set the new auth state in App.jsx
+                window.location.href = '/';
+            } else {
+                throw new Error('로그인에 실패했습니다. (토큰 없음)');
+            }
         } catch (err) {
-            setError(err.message);
+            setError(err.response?.data?.detail || err.message || '로그인 중 오류가 발생했습니다.');
         } finally {
             setLoading(false);
         }

@@ -31,8 +31,9 @@ app.add_middleware(
 def read_root():
     return {"message": "Welcome to Auto-Selp API"}
 
-from src.api.routers import jobs, prompts, settings
+from src.api.routers import jobs, prompts, settings, auth
 
 app.include_router(jobs.router)
 app.include_router(prompts.router)
 app.include_router(settings.router)
+app.include_router(auth.router)
