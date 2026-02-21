@@ -52,9 +52,7 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     req_username = request.username.strip()
     req_password = request.password.strip()
 
-    # Try case-insensitive matching for username
-    from sqlalchemy.sql import func
-    user = db.query(User).filter(func.lower(User.username) == req_username.lower()).first()
+    user = db.query(User).filter(User.username == req_username).first()
     
     if not user:
         raise HTTPException(
@@ -96,12 +94,11 @@ def verify_admin_code(request: AdminCodeRequest):
 
 @router.post("/register-admin")
 def register_admin(request: RegisterAdminRequest, db: Session = Depends(get_db)):
-    from sqlalchemy.sql import func
     req_username = request.username.strip()
     req_password = request.password.strip()
 
-    # Check if a user with the username already exists (case-insensitive)
-    existing_user = db.query(User).filter(func.lower(User.username) == req_username.lower()).first()
+    # Check if a user with the username already exists
+    existing_user = db.query(User).filter(User.username == req_username).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -133,12 +130,11 @@ def register_user(request: RegisterUserRequest, db: Session = Depends(get_db), c
             detail="관리자 권한이 필요합니다."
         )
         
-    from sqlalchemy.sql import func
     req_username = request.username.strip()
     req_password = request.password.strip()
 
     # Check if user already exists
-    existing_user = db.query(User).filter(func.lower(User.username) == req_username.lower()).first()
+    existing_user = db.query(User).filter(User.username == req_username).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
