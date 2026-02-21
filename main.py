@@ -5,7 +5,7 @@ import time
 from tqdm import tqdm
 from dotenv import load_dotenv
 
-# src 모듈 경로 추가
+# src 모듈 경로 추가1
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.excel_handler import ExcelHandler
