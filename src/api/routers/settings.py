@@ -149,8 +149,13 @@ async def get_settings(user: User = Depends(get_current_user), db: Session = Dep
         "updated_at": settings_db.updated_at.isoformat() if settings_db.updated_at else ""
     }
     
+    # 🔍 DEBUG: DB에 저장된 API 키 목록 출력
+    raw_keys = settings_db.api_keys or {}
+    print(f"[DEBUG] GET /settings - user={user.id} - DB api_keys keys: {list(raw_keys.keys())}")
+    
     # API 키 마스킹 처리
     settings["api_keys"] = mask_api_keys(settings.get("api_keys", {}))
+    print(f"[DEBUG] GET /settings - masked api_keys: {list(settings['api_keys'].keys())}")
     
     return settings
 
