@@ -53,5 +53,6 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd /opt/auto-selp
+            export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             docker compose pull
             docker compose up -d
