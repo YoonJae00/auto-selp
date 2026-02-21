@@ -315,8 +315,9 @@ async def test_api_connection(
             import base64
             import httpx
             
+            BASE_URL = "https://api.searchad.naver.com"
             method = 'GET'
-            uri = '/keywordstool'
+            uri = '/ncc/campaigns'
             timestamp = str(round(time.time() * 1000))
             message = f"{timestamp}.{method}.{uri}"
             hash_val = hmac.new(bytes(secret_key, "utf-8"), bytes(message, "utf-8"), hashlib.sha256)
@@ -329,15 +330,14 @@ async def test_api_connection(
                 "X-Customer": customer_id,
                 "X-Signature": signature
             }
-            params = {'hintKeywords': '테스트', 'showDetail': '1'}
-            url = f"https://api.naver.com{uri}"
+            url = f"{BASE_URL}{uri}"
             
-            with httpx.Client(timeout=5.0) as client:
-                response = client.get(url, headers=headers, params=params)
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(url, headers=headers)
                 if response.status_code == 200:
                     return {"success": True, "message": "Naver 광고 API 연결 성공"}
                 else:
-                    raise HTTPException(status_code=400, detail=f"연결 실패: {response.text}")
+                    raise HTTPException(status_code=400, detail=f"연결 실패 ({response.status_code}): {response.text}")
         except Exception as e:
             if isinstance(e, HTTPException):
                 raise
