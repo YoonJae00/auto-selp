@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Settings, LogOut, Wand2, ChevronDown, FileSpreadsheet, Key, Palette } from 'lucide-react';
+import { LayoutDashboard, Settings, LogOut, Wand2, ChevronDown, FileSpreadsheet, Key, Palette, UserPlus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const navItems = [
@@ -20,6 +20,9 @@ export const Sidebar = () => {
     const location = useLocation();
     const [settingsOpen, setSettingsOpen] = useState(location.pathname.includes('/settings'));
     const isSettingsActive = location.pathname.includes('/settings');
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const isAdmin = user?.role === 'admin';
 
     return (
         <motion.aside
@@ -52,6 +55,21 @@ export const Sidebar = () => {
                         <span className="font-medium">{item.label}</span>
                     </NavLink>
                 ))}
+
+                {isAdmin && (
+                    <NavLink
+                        to="/users"
+                        className={({ isActive }) => cn(
+                            "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative",
+                            isActive
+                                ? "bg-primary/10 text-primary shadow-md border border-primary/20 font-medium"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                    >
+                        <UserPlus className="w-5 h-5" />
+                        <span className="font-medium">회원 관리</span>
+                    </NavLink>
+                )}
 
                 {/* Settings Dropdown */}
                 <div>
