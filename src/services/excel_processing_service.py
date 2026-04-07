@@ -45,7 +45,7 @@ def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, k
             chunks[chunk_id]["status"] = "processing"
             chunks[chunk_id]["total_rows"] = total_in_chunk
             
-            job = db.query(Job).filter(Job.id == job_id).first()
+            job = db.query(Job).filter(Job.id == uuid.UUID(job_id)).first()
             if job:
                 job_meta = dict(job.meta_data) if job.meta_data else {}
                 job_meta["chunks"] = chunks
@@ -57,7 +57,7 @@ def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, k
 
         for index, item in enumerate(data_chunk):
             # Check if job has been cancelled
-            job = db.query(Job).filter(Job.id == job_id).first()
+            job = db.query(Job).filter(Job.id == uuid.UUID(job_id)).first()
             if job and job.status == "cancelled":
                 print(f"Job {job_id} was cancelled by user (chunk {chunk_id})")
                 return results
@@ -107,7 +107,7 @@ def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, k
             if (index + 1) % 5 == 0 or index == total_in_chunk - 1:
                 progress = int((index + 1) / total_in_chunk * 100)
                 
-                job = db.query(Job).filter(Job.id == job_id).first()
+                job = db.query(Job).filter(Job.id == uuid.UUID(job_id)).first()
                 if job and job.meta_data:
                     current_meta = dict(job.meta_data)
                     current_chunks = current_meta.get("chunks", [])
@@ -122,7 +122,7 @@ def process_chunk(chunk_id, data_chunk, job_id, user_id, meta_data, pn_prompt, k
                         db.commit()
         
         # Mark chunk as completed
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == uuid.UUID(job_id)).first()
         if job and job.meta_data:
             current_meta = dict(job.meta_data)
             current_chunks = current_meta.get("chunks", [])
@@ -146,7 +146,7 @@ def process_excel_job(job_id: str, user_id: str, file_path: str):
     start_time = time.time()
     
     # 1. Fetch existing job metadata first
-    job = db.query(Job).filter(Job.id == job_id).first()
+    job = db.query(Job).filter(Job.id == uuid.UUID(job_id)).first()
     if not job:
         print(f"Job not found: {job_id}")
         db.close()

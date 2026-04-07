@@ -177,7 +177,7 @@ def list_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_
 
 @router.get("/{job_id}")
 def get_job_status(job_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    job = db.query(Job).filter(Job.id == uuid.UUID(job_id), Job.user_id == user.id).first()
     if not job:
         return {"error": "Job not found"}
     return {
@@ -196,7 +196,7 @@ def get_job_status(job_id: str, user: User = Depends(get_current_user), db: Sess
 @router.get("/{job_id}/download/result")
 def download_result(job_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """처리된 결과 파일을 다운로드합니다."""
-    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    job = db.query(Job).filter(Job.id == uuid.UUID(job_id), Job.user_id == user.id).first()
     
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -220,7 +220,7 @@ def download_result(job_id: str, user: User = Depends(get_current_user), db: Ses
 @router.get("/{job_id}/download/original")
 def download_original(job_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """원본 파일을 다운로드합니다."""
-    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    job = db.query(Job).filter(Job.id == uuid.UUID(job_id), Job.user_id == user.id).first()
     
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -243,7 +243,7 @@ def cancel_job(job_id: str, user: User = Depends(get_current_user), db: Session 
     """
     진행 중인 작업을 취소합니다.
     """
-    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    job = db.query(Job).filter(Job.id == uuid.UUID(job_id), Job.user_id == user.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     

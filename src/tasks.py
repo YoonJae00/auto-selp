@@ -1,5 +1,5 @@
 from celery import shared_task
-from src.api.worker import process_excel_job
+from src.services.excel_processing_service import process_excel_job
 import traceback
 
 @shared_task(bind=True)

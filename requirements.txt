@@ -14,3 +14,7 @@ celery
 redis
 sqlalchemy
 psycopg2-binary
+pytest
+pytest-cov
+pytest-mock
+httpx
