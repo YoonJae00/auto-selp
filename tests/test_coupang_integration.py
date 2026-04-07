@@ -6,10 +6,10 @@ import os
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.api.worker import process_chunk
+from src.services.excel_processing_service import process_chunk
 
 class TestCoupangIntegration(unittest.TestCase):
-    @patch('src.api.worker.get_db')
+    @patch('src.services.excel_processing_service.get_db')
     def test_process_chunk_with_coupang_option(self, mock_get_db):
         # Mock DB response
         mock_db = MagicMock()
