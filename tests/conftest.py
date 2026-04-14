@@ -5,9 +5,11 @@ from sqlalchemy.orm import sessionmaker
 import os
 import sys
 
-# Set test environment variables before any imports
-os.environ["DATABASE_URL"] = "sqlite:///./test.db"
-os.environ["JWT_SECRET_KEY"] = "test_secret_key_for_jwt"
+# Set test environment variables only if not already set
+if "DATABASE_URL" not in os.environ:
+    os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+if "JWT_SECRET_KEY" not in os.environ:
+    os.environ["JWT_SECRET_KEY"] = "test_secret_key_for_jwt"
 
 # Add the project root directory to the python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -16,11 +18,14 @@ from src.api.database import Base
 from src.api.main import app
 from src.api.deps import get_db
 
-# Use an in-memory SQLite database for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+# Use environment variable if provided (e.g. from Docker), otherwise default to SQLite
+SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./test.db")
+
+# PostgreSQL의 경우 check_same_thread 인자가 필요 없으므로 조건부 설정
+connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL, connect_args=connect_args
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -30,7 +35,7 @@ def setup_database():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
-    if os.path.exists("./test.db"):
+    if SQLALCHEMY_DATABASE_URL.startswith("sqlite") and os.path.exists("./test.db"):
         os.remove("./test.db")
 
 @pytest.fixture()

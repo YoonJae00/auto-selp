@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: auto_selp_local_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: auto_selp_db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: auto_selp_local_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: auto_selp_local_backend
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/auto_selp_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=local-dev-secret-key
+      - PYTHONPATH=/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # 서버 실행 전 로컬 환경 초기화 스크립트 실행
+    command: ["sh", "-c", "python3 -u scripts/setup_local_dev.py && uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload"]
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: auto_selp_local_worker
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/auto_selp_db
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["celery", "-A", "src.celery_app.celery_app", "worker", "--loglevel=info", "--pool=threads", "--concurrency=4"]
