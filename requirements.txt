@@ -19,3 +19,4 @@ pytest-cov
 pytest-mock
 httpx
 pytest-env
+passlib[argon2]==1.7.4

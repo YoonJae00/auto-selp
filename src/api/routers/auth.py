@@ -8,6 +8,7 @@ import os
 from src.api.database import get_db
 from src.api.models import User, UserSettings
 from src.api.deps import get_current_user
+from src.api.auth_utils import hash_password, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -60,8 +61,8 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             detail=f"존재하지 않는 아이디입니다. (입력창에 공백이 없는지 확인해주세요)"
         )
     
-    # In a real app we would use hashed passwords, but using string comparison for simplicity as before
-    if user.hashed_password != req_password:
+    # Argon2 해싱 기반 비밀번호 검증
+    if not verify_password(req_password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="비밀번호가 일치하지 않습니다."
@@ -107,9 +108,9 @@ def register_admin(request: RegisterAdminRequest, db: Session = Depends(get_db))
         
     user = User(
         username=req_username, 
-        hashed_password=req_password,
+        hashed_password=hash_password(req_password), # 해싱 저장
         role="admin",
-        is_profile_completed=True # Admins skip the regular profile setup
+        is_profile_completed=True 
     )
     db.add(user)
     db.commit()
@@ -143,9 +144,9 @@ def register_user(request: RegisterUserRequest, db: Session = Depends(get_db), c
         
     user = User(
         username=req_username, 
-        hashed_password=req_password,
+        hashed_password=hash_password(req_password), # 해싱 저장
         role="user",
-        is_profile_completed=False # Needs to complete profile upon first login
+        is_profile_completed=False 
     )
     db.add(user)
     db.commit()
