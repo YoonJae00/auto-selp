@@ -9,7 +9,7 @@ class CategoryProcessor:
     # Class-level cache for mapping data to avoid reloading heavily
     _mapping_cache = {}
 
-    def __init__(self, mapping_file_path: str = "naver_category_mapping.xls", api_keys: dict = None):
+    def __init__(self, mapping_file_path: str = "data/naver_category_mapping.xls", api_keys: dict = None):
         if api_keys is None:
             api_keys = {}
         self.naver_client_id = api_keys.get("naver_client_id") or os.getenv("NAVER_CLIENT_ID")

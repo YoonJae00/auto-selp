@@ -1,9 +1,9 @@
 from typing import Dict, Any, Optional
 from .processing_pipeline import BaseProcessorStage
-from src.product_name_processor import ProductNameProcessor
-from src.keyword_processor import KeywordProcessor
-from src.category_processor import CategoryProcessor
-from src.coupang_category_processor import CoupangCategoryProcessor
+from src.processors.product_name_processor import ProductNameProcessor
+from src.processors.keyword_processor import KeywordProcessor
+from src.processors.category_processor import CategoryProcessor
+from src.processors.coupang_category_processor import CoupangCategoryProcessor
 
 class ProductNameStage(BaseProcessorStage):
     """상품명 정제 스테이지"""

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from src.api.deps import get_current_user, get_db
 from src.api.models import User, Job
 from src.tasks import run_excel_processing_job
-from src.excel_handler import ExcelHandler
+from src.utils.excel_handler import ExcelHandler
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
