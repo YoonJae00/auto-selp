@@ -1,4 +1,4 @@
-from src.llm_provider import OpenAIProvider
+from src.utils.llm_provider import OpenAIProvider
 import os
 
 # 테스트용 더티 키 (보이지 않는 문자 포함)

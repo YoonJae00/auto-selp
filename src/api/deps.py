@@ -13,8 +13,7 @@ ALGORITHM = "HS256"
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     """
-    Supabase Auth (JWT) 검증 제거 후, 자체 JWT/DB 기반 사용자 ID 반환.
-    개발 중에는 하드코딩된 dummy admin을 반환할 수 있도록 예비 구성.
+    자체 JWT/DB 기반 사용자 인증 및 사용자 정보 반환.
     """
     if not credentials:
         raise HTTPException(

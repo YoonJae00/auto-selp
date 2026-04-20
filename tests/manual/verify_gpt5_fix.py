@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 
 sys.path.append(os.getcwd())
 
-from src.keyword_processor import KeywordProcessor
-from src.product_name_processor import ProductNameProcessor
-from src.llm_provider import get_llm_provider
+from src.processors.keyword_processor import KeywordProcessor
+from src.processors.product_name_processor import ProductNameProcessor
+from src.utils.llm_provider import get_llm_provider
 
 load_dotenv()
 

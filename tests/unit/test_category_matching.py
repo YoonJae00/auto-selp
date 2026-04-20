@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from src.category_processor import CategoryProcessor
+from src.processors.category_processor import CategoryProcessor
 
 def test_category_matching():
     print("=" * 60)
@@ -13,12 +13,12 @@ def test_category_matching():
     print("=" * 60)
     
     # CategoryProcessor 초기화
-    cat_processor = CategoryProcessor(mapping_file_path="naver_category_mapping.xls")
+    cat_processor = CategoryProcessor(mapping_file_path="data/naver_category_mapping.xls")
     
     # 매핑 파일 로드 확인
     if not cat_processor.category_mapping:
         print("[ERROR] 매핑 파일이 로드되지 않았습니다.")
-        print("프로젝트 루트에 'naver_category_mapping.xls' 파일이 있는지 확인하세요.")
+        print("data/ 폴더에 'naver_category_mapping.xls' 파일이 있는지 확인하세요.")
         return
     
     print(f"\n✓ 매핑 파일 로드 완료: {len(cat_processor.category_mapping)}개 항목")

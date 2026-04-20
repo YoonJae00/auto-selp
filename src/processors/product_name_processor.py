@@ -2,7 +2,7 @@ import os
 import re
 from dotenv import load_dotenv
 from typing import Optional
-from src.llm_provider import BaseLLMProvider, get_llm_provider
+from src.utils.llm_provider import BaseLLMProvider, get_llm_provider
 
 load_dotenv()
 

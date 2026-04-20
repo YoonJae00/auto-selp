@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 # Add src to path
 sys.path.append(os.getcwd())
 
-from src.user_settings_utils import get_user_api_key
+from src.utils.user_settings_utils import get_user_api_key
 from src.api.database import get_db
 
 load_dotenv()

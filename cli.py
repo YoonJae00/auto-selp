@@ -8,16 +8,16 @@ from dotenv import load_dotenv
 # src 모듈 경로 추가1
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.excel_handler import ExcelHandler
-from src.product_name_processor import ProductNameProcessor
-from src.keyword_processor import KeywordProcessor
-from src.category_processor import CategoryProcessor
+from src.utils.excel_handler import ExcelHandler
+from src.processors.product_name_processor import ProductNameProcessor
+from src.processors.keyword_processor import KeywordProcessor
+from src.processors.category_processor import CategoryProcessor
 
 def main():
     load_dotenv()
     
     parser = argparse.ArgumentParser(description="Auto-Selp: 쇼핑몰 대량등록 상품 가공 자동화 툴")
-    parser.add_argument("input_file", nargs='?', default="sample_input.xlsx", help="가공할 엑셀 파일 경로")
+    parser.add_argument("input_file", nargs='?', default="data/sample_input.xlsx", help="가공할 엑셀 파일 경로")
     parser.add_argument("--p_col", default="A", help="상품명 열 문자 (기본: A)")
     parser.add_argument("--k_col", default="E", help="기존 키워드 열 문자 (기본: E)")
     parser.add_argument("--start_col", default="H", help="결과 저장 시작 열 문자 (기본: H)")
@@ -40,7 +40,7 @@ def main():
         excel = ExcelHandler()
         pnp = ProductNameProcessor()
         kp = KeywordProcessor()
-        cp = CategoryProcessor(mapping_file_path="mapping.xlsx")
+        cp = CategoryProcessor(mapping_file_path="data/naver_category_mapping.xls")
     except Exception as e:
         print(f"[ERROR] 초기화 실패: {e}")
         return

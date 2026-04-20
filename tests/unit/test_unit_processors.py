@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock
-from src.product_name_processor import ProductNameProcessor
-from src.keyword_processor import KeywordProcessor
-from src.category_processor import CategoryProcessor
+from src.processors.product_name_processor import ProductNameProcessor
+from src.processors.keyword_processor import KeywordProcessor
+from src.processors.category_processor import CategoryProcessor
 
 @pytest.fixture
 def mock_llm_provider():

@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 # src 모듈 경로 설정을 위해
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.product_name_processor import ProductNameProcessor
-from src.keyword_processor import KeywordProcessor
+from src.processors.product_name_processor import ProductNameProcessor
+from src.processors.keyword_processor import KeywordProcessor
 
 def verify_core_logic():
     load_dotenv()

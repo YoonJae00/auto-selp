@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 # Add src to path
 sys.path.append(os.getcwd())
 
-from src.keyword_processor import KeywordProcessor
-from src.llm_provider import get_llm_provider
+from src.processors.keyword_processor import KeywordProcessor
+from src.utils.llm_provider import get_llm_provider
 
 load_dotenv()
 

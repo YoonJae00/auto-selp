@@ -4,7 +4,7 @@ import os
 # src 모듈을 찾기 위해 경로 추가
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.keyword_processor import KeywordProcessor
+from src.processors.keyword_processor import KeywordProcessor
 
 def test_coupang_crawling():
     print("\n[TEST] Coupang Crawling Start")

@@ -8,10 +8,10 @@ import re
 from typing import List, Optional, Dict, Tuple
 from curl_cffi import requests as cffi_requests
 from dotenv import load_dotenv
-from src.llm_provider import BaseLLMProvider, get_llm_provider
-from src.trademark_blacklist import contains_trademark, filter_trademarked_keywords
+from src.utils.llm_provider import BaseLLMProvider, get_llm_provider
+from src.processors.trademark_blacklist import contains_trademark, filter_trademarked_keywords
 
-from src.keyword_stop_words import KEYWORD_STOP_WORDS
+from src.processors.keyword_stop_words import KEYWORD_STOP_WORDS
 
 load_dotenv()
 
